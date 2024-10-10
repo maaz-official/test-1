@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const teamMembershipSchema = new mongoose.Schema({
   team_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  role: { type: String, enum: ['Captain', 'Player', 'Substitute'] },
+  role: { type: String, enum: ['captain', 'player', 'substitute'] },
   joined_at: { type: Date, default: Date.now },
 });
 
