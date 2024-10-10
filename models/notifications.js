@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 // Constants for Validations
-const NOTIFICATION_TYPES = ['event', 'general', 'alert', 'reminder', 'promotion'];
+const NOTIFICATION_TYPES = ['event', 'general', 'alert', 'reminder', 'promotion', 'update', 'warning'];
 
 // Schema Definition
 const notificationSchema = new mongoose.Schema({
@@ -14,7 +14,8 @@ const notificationSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true,
-    trim: true,    
+    trim: true,
+    maxlength: 500, 
   },
   is_read: {
     type: Boolean,
@@ -35,6 +36,12 @@ const notificationSchema = new mongoose.Schema({
   updated_at: {
     type: Date,
     default: Date.now,
+  },
+  // New field for notification priority
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium',
   },
 });
 
@@ -63,8 +70,21 @@ notificationSchema.methods.markAsRead = async function () {
   await this.save();
 };
 
+// Static Method to Get Notifications by Type
+notificationSchema.statics.getByType = async function (userId, type) {
+  return this.find({ user_id: userId, type }).sort({ created_at: -1 });
+};
+
+// Instance Method to Send Notification (Simulated for Implementation)
+notificationSchema.methods.sendNotification = async function () {
+  // Simulate sending the notification via an external service or internal mechanism
+  console.log(`Sending notification to user ${this.user_id}: ${this.message}`);
+  // Here you could implement actual notification sending logic (e.g., email, push notification)
+  // For example, using a service like Firebase Cloud Messaging or similar
+};
+
 // Index for Performance
-notificationSchema.index({ user_id: 1, created_at: -1 }); // Index for faster retrieval by user and creation date
+notificationSchema.index({ user_id: 1, created_at: -1 });
 
 // Export the Notification Model
 const Notification = mongoose.model('Notification', notificationSchema);
