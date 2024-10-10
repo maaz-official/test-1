@@ -6,7 +6,7 @@ const userProfileSchema = new mongoose.Schema({
   last_name: { type: String, required: true },
   profile_picture_url: { type: String },
   phone_number: { type: String, unique: true, index: true },
-  experience_level: { type: String, enum: ['Beginner', 'Intermediate', 'Advanced'] },
+  experience_level: { type: String, enum: ['beginner', 'intermediate', 'advanced'] },
   bio: { type: String },
   created_at: { type: Date, default: Date.now, index: true },
   updated_at: { type: Date, default: Date.now },

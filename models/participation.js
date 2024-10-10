@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 const participationSchema = new mongoose.Schema({
   event_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true, index: true },
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  status: { type: String, enum: ['Registered', 'Attended', 'Cancelled'], index: true },
+  status: { type: String, enum: ['registered', 'attended', 'cancelled', 'active', 'spectating'], index: true },
+  role: { type: String, enum: ['host', 'participant', 'spectator'], index: true },
   registered_at: { type: Date, default: Date.now },
 });
 

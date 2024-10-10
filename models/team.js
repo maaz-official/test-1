@@ -4,6 +4,8 @@ const teamSchema = new mongoose.Schema({
   event_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true, index: true },
   name: { type: String, required: true },
   max_members: { type: Number, required: true },
+  min_members: { type: Number, required: true },
+  // rankings 
   created_at: { type: Date, default: Date.now, index: true },
   updated_at: { type: Date, default: Date.now },
 });
