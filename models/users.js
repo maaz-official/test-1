@@ -1,13 +1,23 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import validator from 'validator'; // Assuming you're using 'validator' for validation
 
 // Constants
-const SALT_WORK_FACTOR = 12;  // Increase salt rounds for stronger security
-const RESET_PASSWORD_EXPIRATION = 60 * 60 * 1000; // 1 hour
+const SALT_WORK_FACTOR = 12;  // Increased salt rounds for stronger security
+const RESET_PASSWORD_EXPIRATION = 60 * 60 * 1000; // 1 hour for reset token expiration
+const LOCK_TIME = 2 * 60 * 60 * 1000; // 2 hours lock for failed login attempts
 
 // Schema Definition
 const userSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    unique: true,
+    required: true,
+    trim: true,
+    match: [/^[a-zA-Z0-9._-]{3,30}$/, 'Invalid username format'], // Restricting special characters
+    index: true
+  },
   email: { 
     type: String, 
     unique: true, 
@@ -15,27 +25,34 @@ const userSchema = new mongoose.Schema({
     index: true, 
     lowercase: true,
     trim: true, 
-    match: [/\S+@\S+\.\S+/, 'Invalid email format'],
+    validate: {
+      validator: (v) => validator.isEmail(v),
+      message: 'Invalid email format'
+    }
   },
   password_hash: { 
     type: String, 
     required: true 
   },
-  phone: {
+  phone_number: {
     type: String,
     unique: true,
-    sparse: true, // Allows for optional unique field
-    match: [/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format'], // E.164 format validation
+    sparse: true,
+    validate: {
+      validator: (v) => validator.isMobilePhone(v, null, { strictMode: true }),
+      message: 'Invalid phone number format'
+    },
+    index: true
   },
   status: { 
     type: String, 
-    enum: ['active', 'ban', 'suspended', 'pending', 'locked'],  // Added more states
+    enum: ['active', 'banned', 'suspended', 'pending', 'locked'],  
     default: 'active', 
     index: true 
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'moderator', 'creator'],
+    enum: ['user', 'admin', 'moderator'],
     default: 'user',
     index: true
   },
@@ -49,7 +66,7 @@ const userSchema = new mongoose.Schema({
   },
   two_factor_secret: {
     type: String,
-    select: false // Stored securely if 2FA is enabled
+    select: false 
   },
   created_at: { 
     type: Date, 
@@ -62,25 +79,25 @@ const userSchema = new mongoose.Schema({
   },
   reset_password_token: {
     type: String,
-    select: false, // Excludes field from query by default
+    select: false, 
   },
   reset_password_expires: {
     type: Date,
     select: false,
   },
   password_changed_at: {
-    type: Date, // Useful for session invalidation after password changes
+    type: Date, 
   },
   login_attempts: {
     type: Number,
-    default: 0,  // Track failed login attempts
+    default: 0,
   },
   lock_until: {
-    type: Date, // Temporarily lock account after too many failed login attempts
+    type: Date, 
   },
 }, {
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, // Automatic timestamps
-  toJSON: { virtuals: true }, // Include virtuals in JSON output
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+  toJSON: { virtuals: true }, 
   toObject: { virtuals: true }
 });
 
@@ -109,8 +126,8 @@ userSchema.virtual('admin', {
 });
 
 // Indexes for Performance
-userSchema.index({ created_at: 1, status: 1 });
-userSchema.index({ email: 1, phone: 1 });
+userSchema.index({ email: 1, phone_number: 1 });
+userSchema.index({ username: 1, status: 1 });
 userSchema.index({ role: 1, last_login: 1 });
 
 // Password Hashing Pre-Save Hook
@@ -120,7 +137,7 @@ userSchema.pre('save', async function (next) {
   try {
     const salt = await bcrypt.genSalt(SALT_WORK_FACTOR);
     this.password_hash = await bcrypt.hash(this.password_hash, salt);
-    this.password_changed_at = Date.now(); // Update password change timestamp
+    this.password_changed_at = Date.now();
     next();
   } catch (err) {
     next(err);
@@ -151,11 +168,7 @@ userSchema.statics.findByResetPasswordToken = async function(token) {
 
 // Increment Failed Login Attempts and Lock Account if Necessary
 userSchema.methods.incrementLoginAttempts = async function() {
-  const LOCK_TIME = 2 * 60 * 60 * 1000; // 2 hours
-
-  if (this.lock_until && this.lock_until > Date.now()) {
-    return; // Account is already locked
-  }
+  if (this.lock_until && this.lock_until > Date.now()) return;
 
   this.login_attempts += 1;
 
