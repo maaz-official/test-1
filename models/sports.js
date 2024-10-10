@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-// Constants for Validations
 const ICON_URL_REGEX = /^(http|https):\/\/[^\s]+$/;
 
 // Schema Definition
