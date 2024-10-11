@@ -8,16 +8,16 @@ const eventAnalyticsSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  unique_views: { type: Number, default: 0 }, // Track unique views
-  total_views: { type: Number, default: 0 }, // Track total views
-  participants_count: { type: Number, default: 0 }, // Total participants
-  returning_participants: { type: Number, default: 0 }, // Count of returning participants
+  unique_views: { type: Number, default: 0, min: 0 }, // Track unique views
+  total_views: { type: Number, default: 0, min: 0 }, // Track total views
+  participants_count: { type: Number, default: 0, min: 0 }, // Total participants
+  returning_participants: { type: Number, default: 0, min: 0 }, // Count of returning participants
   reactions: {
-    likes: { type: Number, default: 0 },
-    shares: { type: Number, default: 0 },
-    comments: { type: Number, default: 0 }
+    likes: { type: Number, default: 0, min: 0 },
+    shares: { type: Number, default: 0, min: 0 },
+    comments: { type: Number, default: 0, min: 0 }
   },
-  average_session_duration: { type: Number, default: 0 }, // Duration in seconds
+  average_session_duration: { type: Number, default: 0, min: 0 }, // Duration in seconds
   created_at: { type: Date, default: Date.now },
   start_date: { type: Date }, // Start date for analytics tracking
   end_date: { type: Date }, // End date for analytics tracking
