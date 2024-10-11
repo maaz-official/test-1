@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\InSport\\insport-backend\\utils\\logging\\logs\\.6a7a72f4dd50bbcbb5cefa71e99e8618e6855cdd-audit.json",
+    "files": [
+        {
+            "date": 1728674583782,
+            "name": "D:\\InSport\\insport-backend\\utils\\logging\\logs\\error-2024-10-12.log",
+            "hash": "655a205a2f026b8dbb2d6da8b8ef3d5465f9ccef101ee0c3cb0bd3991323bc7b"
+        }
+    ],
+    "hashType": "sha256"
+}
