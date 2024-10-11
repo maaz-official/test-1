@@ -1,67 +1,119 @@
 const winston = require('winston');
-const { format } = require('winston');
 const path = require('path');
-const { createLogger, transports, combine, timestamp, json } = winston;
+const DailyRotateFile = require('winston-daily-rotate-file');
 
 // Define log file paths for better organization
 const logDirectory = path.join(__dirname, 'logs');
 
-/**
- * Configures the Winston logger for structured logging.
- * This logger can log to both the console and files, with different levels and formats.
- */
-const logger = createLogger({
-    level: 'info', // Set default logging level
-    format: combine(
-        timestamp(), // Add timestamp to each log entry
-        json() // Use JSON format for structured logging
-    ),
-    transports: [
-        // Log to console with color formatting
-        new transports.Console({
-            format: format.combine(
-                format.colorize(), // Add color to console logs
-                format.simple() // Use a simple format for console output
-            )
-        }),
-        // Log to a file for all messages
-        new transports.File({
-            filename: path.join(logDirectory, 'combined.log'), // Log all levels to combined.log
-            level: 'info', // Include all info level messages and higher
-        }),
-        // Log to a separate file for error messages
-        new transports.File({
-            filename: path.join(logDirectory, 'error.log'), // Log error level messages to error.log
-            level: 'error', // Only log error messages
-        }),
-    ],
+// Ensure log directory exists or create it
+const fs = require('fs');
+if (!fs.existsSync(logDirectory)) {
+    fs.mkdirSync(logDirectory);
+}
+
+// Custom format for console output in development
+const consoleFormat = winston.format.printf(({ level, message, timestamp, stack }) => {
+    const separator = '\n----------------------------------------\n';
+    return stack
+        ? `${separator}${timestamp} [${level.toUpperCase()}]: ${message}\n${stack}${separator}`
+        : `${separator}${timestamp} [${level.toUpperCase()}]: ${message}${separator}`;
 });
 
-/**
- * Logs a message at the specified level.
- * This function can be used throughout the application for logging various messages.
- * @param {string} level - The logging level (e.g., 'info', 'error', 'warn').
- * @param {string} message - The message to log.
- * @param {Object} [meta={}] - Optional metadata to include in the log entry.
- */
-const log = (level, message, meta = {}) => {
-    if (typeof message !== 'string' || !message.trim()) {
-        console.warn('Invalid log message.'); // Warn if message is not valid
-        return;
-    }
+// Create a Winston logger with different configurations based on environment
+const logger = winston.createLogger({
+    level: 'info', // Default logging level
+    format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), // Timestamp format
+        winston.format.errors({ stack: true }), // Include stack trace for errors
+        winston.format.json() // Default JSON format for file logs
+    ),
+    transports: [
+        // Console transport for human-readable logs in development
+        new winston.transports.Console({
+            level: process.env.NODE_ENV === 'production' ? 'error' : 'debug',
+            format: process.env.NODE_ENV === 'production'
+                ? winston.format.combine(
+                    winston.format.timestamp(),
+                    winston.format.json() // JSON format for production console
+                )
+                : winston.format.combine(
+                    winston.format.colorize(), // Add color for better readability in console
+                    consoleFormat // Human-readable format for development console
+                )
+        }),
 
-    logger.log(level, message, meta); 
-};
+        // Daily rotation for all logs in JSON format for file storage
+        new DailyRotateFile({
+            filename: path.join(logDirectory, 'combined-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '14d', // Keep logs for 14 days
+            level: 'info', // Log all levels from info and above
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.json() // JSON format for file storage
+            )
+        }),
 
-module.exports = { log };
-// // Logging an informational message
-// log('info', 'Application has started successfully.');
+        // Separate error logs in JSON format for file storage
+        new DailyRotateFile({
+            filename: path.join(logDirectory, 'error-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '30d', // Keep error logs for 30 days
+            level: 'error', // Only log error messages
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.json() // JSON format for file storage
+            )
+        })
+    ],
 
-// // Logging an error message with metadata
-// log('error', 'An error occurred while processing the request.', { userId: 123, errorCode: 'USER_NOT_FOUND' });
+    // Handle uncaught exceptions globally
+    exceptionHandlers: [
+        new DailyRotateFile({
+            filename: path.join(logDirectory, 'exceptions-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '30d', // Keep exception logs for 30 days
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.json() // JSON for file logs
+            )
+        }),
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize(),
+                consoleFormat // Human-readable format for console in development
+            )
+        })
+    ],
 
-// // Logging a warning message
-// log('warn', 'This is a warning message.');
+    // Handle unhandled promise rejections globally
+    rejectionHandlers: [
+        new DailyRotateFile({
+            filename: path.join(logDirectory, 'rejections-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '30d', // Keep rejection logs for 30 days
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.json() // JSON for file logs
+            )
+        }),
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize(),
+                consoleFormat // Human-readable format for console in development
+            )
+        })
+    ]
+});
 
-// // Attempting to log an invalid message
-// log('info', ''); // This will trigger a warning about invalid log message
+// Export the logger
+module.exports = logger;
+
+// Usage in your code:
+// const logger = require('./utils/logger');
+// logger.info('This is an informational message');
+// logger.error('This is an error message', { errorCode: 'ERROR_001', userId: '12345' });

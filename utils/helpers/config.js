@@ -61,5 +61,5 @@ const getAllConfig = () => {
 module.exports = {
     getConfig,
     getAllConfig,
-    ConfigError,
+    // ConfigError,
 };
