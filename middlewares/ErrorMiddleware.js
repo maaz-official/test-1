@@ -1,4 +1,4 @@
-const { ApiError, HttpStatus } = require('../utils/api/apiError');
+﻿const { ApiError, HttpStatus } = require('../utils/api/apiError');
 
 /**
  * Centralized error handling middleware for Express applications.

@@ -1,11 +1,14 @@
 const crypto = require('crypto');
-const redis = require('./redisClient'); // Redis client instance
-const twilio = require('twilio');
-const { getConfig } = require('./config'); // Get configurations
-const logger = require('./logger'); // Custom logger for error reporting
+const redis = require('../cache/redisClient');
+const { Vonage } = require('@vonage/server-sdk');
+const logger = require('../logging/logger'); 
+const { getConfig } = require('../helpers/config');
 
-// Twilio client (replace with your Twilio credentials)
-const twilioClient = twilio(getConfig('TWILIO_SID'), getConfig('TWILIO_AUTH_TOKEN'));
+// Initialize Vonage client with your API key and secret
+const vonage = new Vonage({
+    apiKey: getConfig('VONAGE_API_KEY'),
+    apiSecret: getConfig('VONAGE_API_SECRET'),
+});
 
 // OTP configuration from environment variables
 const OTP_LENGTH = getConfig('OTP_LENGTH', 6);
@@ -50,17 +53,17 @@ const generateOtp = (length = OTP_LENGTH) => {
 };
 
 /**
- * Send OTP to the provided phone number using Twilio.
+ * Send OTP to the provided phone number using Nexmo (Vonage).
  * @param {string} phone - The phone number to send OTP to.
  * @param {string} otp - The OTP code to send.
  */
 const sendOtp = async (phone, otp) => {
     try {
-        // Send the OTP via Twilio SMS
-        await twilioClient.messages.create({
-            body: `Your verification code is ${otp}`,
-            from: getConfig('TWILIO_PHONE_NUMBER'),
+        // Send the OTP via Vonage SMS
+        await vonage.sms.send({
             to: phone,
+            from: getConfig('VONAGE_FROM_NUMBER'),
+            text: `Your verification code is ${otp}`,
         });
 
         logger.info(`OTP sent to phone number ${phone}`);
