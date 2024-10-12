@@ -115,7 +115,7 @@ userSchema.pre('save', async function (next) {
 
   try {
     this.password_hash = await argon2.hash(this.password_hash, {
-      type: argon2.argon2id, // Argon2id is preferred for most use cases
+      type: argon2.argon2id,
     });
     this.password_changed_at = Date.now();
     next();

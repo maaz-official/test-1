@@ -3,79 +3,94 @@
 
 const { AuthService } = require("../services");
 const { getConfig } = require("../utils/helpers/config");
-const { parseCookies } = require("../utils/helpers/helperFunctions");
+const jwt = require('jsonwebtoken');
 
-const ACCOUNT_CREATION_TOKEN_EXPIRATION = getConfig('ACCOUNT_CREATION_TOKEN_EXPIRATION', 1000); //30 minutes
+const ACCOUNT_CREATION_TOKEN_EXPIRATION = getConfig('ACCOUNT_CREATION_TOKEN_EXPIRATION', 1800); // 30 minutes
 
-// Create account - Step 1 (email/phone input)
+// Create account - Step 1 (phone input)
 exports.createAccount = async (req, res, next) => {
     try {
-        
-        const result = await AuthService.createAccount(req.body); 
-        res.status(200).json(result);
+        const { phone } = req.body;
+
+        if (!phone) {
+            return res.status(400).json({ message: 'Phone number is required' });
+        }
+
+        // Call AuthService to initiate account creation by sending OTP
+        const result = await AuthService.createAccount({ phone });
+
+        // Set token as an HTTP-only cookie
+        res.cookie('accountCreationToken', result.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Set 'true' for production
+            sameSite: 'Strict',
+            maxAge: ACCOUNT_CREATION_TOKEN_EXPIRATION * 1000, // 30 minutes
+        });
+
+        // Respond with a success message
+        res.status(200).json({ message: 'OTP sent to phone' });
     } catch (error) {
-        next(error); 
+        next(error);
     }
 };
-
 
 // OTP verification - Step 2
 exports.verifyOtp = async (req, res, next) => {
-    const { otpTarget, otp } = req.body;
-
     try {
-        // Call the service to verify OTP and generate the token
-        const { message, otpTarget: verifiedTarget, token } = await AuthService.verifyOtp({ otpTarget, otp });
+        const { phone, otp } = req.body;
 
-        // Set the JWT token in a secure, HttpOnly cookie
-        res.cookie('accountCreationToken', token, {
+        if (!phone || !otp) {
+            return res.status(400).json({ message: 'Phone and OTP are required' });
+        }
+
+        // Call AuthService to verify OTP and return token if successful
+        const result = await AuthService.verifyOtp({ phone, otp });
+
+        // Set the verified token in the HTTP-only cookie for further steps
+        res.cookie('accountCreationToken', result.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'Strict',
-            maxAge: ACCOUNT_CREATION_TOKEN_EXPIRATION * 1000,
+            maxAge: ACCOUNT_CREATION_TOKEN_EXPIRATION * 1000, // 30 minutes
         });
 
-        res.status(200).json({ message: 'OTP verified', otpTarget: verifiedTarget });
-
+        // Respond with success message
+        res.status(200).json({ message: 'Phone number verified' });
     } catch (error) {
-        next(error); 
-    }
-}
-
-
-// Enter user details - Step 3
-exports.enterDetails = async (req, res, next) => {
-    const { first_name, last_name, email, phone } = req.body;
-    const token = req.cookies ? req.cookies.accountCreationToken : null;
-    
-    if (!token) {
-        console.error("Missing token in cookies:", req.cookies);
-        return res.status(401).json({ message: 'Authorization token is missing from cookies.' });
-    }
-    if (!first_name || !last_name) {
-        return res.status(400).json({ message: 'First name and last name are required.' });
-    }
-
-    if (!email || !phone) {
-        return res.status(400).json({ message: 'Both email and phone is required.' });
-    }
-
-    try {
-        const result = await AuthService.enterDetails({ first_name, last_name, email, phone, token });
-        res.status(200).json(result);
-    } catch (error) {
-        next(error);  
+        next(error);
     }
 };
 
-
-// Password setup - Step 4
-exports.setPassword = async (req, res, next) => {
-    const { email, password, confirmPassword } = req.body;
+// Enter user details - Step 3
+exports.enterDetails = async (req, res, next) => {
     try {
-        const result = await AuthService.setPassword({ email, password, confirmPassword });
+        const { first_name, last_name, email, password, confirmPassword } = req.body;
+        console.log("🚀 ~ exports.enterDetails= ~ req.body:", req.body)
+
+        // Get the account creation token from the cookies
+        const token = req.cookies.accountCreationToken;
+
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token is missing' });
+        }
+
+        // Decode the JWT token to extract the phone number
+        const { phone } = jwt.verify(token, getConfig('JWT_SECRET'));
+        console.log("🚀 ~ exports.enterDetails= ~ phone:", phone)
+
+        // Call AuthService to complete the account creation process with provided details
+        const result = await AuthService.enterDetails({
+            first_name,
+            last_name,
+            email,
+            password,
+            confirmPassword,
+            phone
+        });
+
+        // Respond with success message and created user details
         res.status(200).json(result);
     } catch (error) {
-        throw error;
+        next(error);
     }
 };
