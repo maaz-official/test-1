@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Validations
 const PARTICIPATION_STATUSES = ['registered', 'attended', 'cancelled', 'active', 'spectating'];
 const PARTICIPANT_ROLES = ['host', 'participant', 'spectator'];
@@ -148,4 +147,4 @@ participationSchema.statics.getUserParticipationSummary = async function (userId
 
 // Export the Participation Model
 const Participation = mongoose.model('Participation', participationSchema);
-export default Participation;
+module.exports = Participation;

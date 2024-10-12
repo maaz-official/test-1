@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
-import { isValidObjectId } from 'mongoose'; 
-import validator from 'validator';  
+const mongoose = require('mongoose');
+const { isValidObjectId } = require('mongoose'); 
+const validator = require('validator');
 
 const userFavoriteSportSchema = new mongoose.Schema({
   user_id: { 
@@ -164,4 +164,4 @@ userFavoriteSportSchema.pre('save', function (next) {
 });
 
 const UserFavoriteSport = mongoose.model('UserFavoriteSport', userFavoriteSportSchema);
-export default UserFavoriteSport;
+module.exports = UserFavoriteSport;

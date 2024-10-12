@@ -12,8 +12,7 @@ const logger = require('./utils/logging/logger.js');
 const { getConfig } = require('./utils/helpers/config.js'); 
 const errorMiddleware = require('./middlewares/ErrorMiddleware.js');
 const routes = require('./routes/index.js'); 
-const { connectDB } = require('./config/db.js'); 
-
+const { connectDB, gracefulDBShutdown} = require('./config/db.js'); 
 dotenv.config();
 
 // Initialize express app
@@ -31,10 +30,14 @@ const limiter = rateLimit({
   message: 'Too many requests, please try again later.',
 });
 
-app.use(limiter); // Apply the rate limiting middleware to all requests
+app.use(limiter);
 
 // Setup for logging incoming requests
-app.use(morgan('combined', { stream: logger.stream })); // HTTP request logging
+app.use(morgan('combined', {
+  stream: {
+    write: (message) => logger.info(message.trim()), 
+  },
+})); 
 
 // Parse incoming requests with JSON payloads
 app.use(bodyParser.json());
@@ -44,7 +47,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 connectDB();
 
 // Route Middlewares (modularized)
-app.use('/users', routes.userRoutes);
+// app.use('/users', routes.userRoutes);
 app.use('/auth', routes.authRoutes);
 // app.use('/events', routes.eventRoutes);
 // app.use('/players', routes.playerRoutes);
@@ -89,7 +92,7 @@ const gracefulShutdown = async () => {
     logger.info('Shutting down server gracefully...');
     
     // Close the MongoDB connection
-    await mongoose.connection.close();
+    gracefulDBShutdown()
     
     // Stop the server
     server.close(() => {

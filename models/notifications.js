@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Validations
 const NOTIFICATION_TYPES = ['event', 'general', 'alert', 'reminder', 'promotion', 'update', 'warning'];
 
@@ -88,4 +87,4 @@ notificationSchema.index({ user_id: 1, created_at: -1 });
 
 // Export the Notification Model
 const Notification = mongoose.model('Notification', notificationSchema);
-export default Notification;
+module.exports = Notification;

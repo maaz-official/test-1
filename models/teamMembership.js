@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Role and Status Enums
 const ROLES = ['captain', 'player', 'substitute'];
 const STATUSES = ['active', 'inactive', 'removed'];
@@ -97,4 +96,4 @@ teamMembershipSchema.post('save', function (doc) {
 
 // Export the TeamMembership Model
 const TeamMembership = mongoose.model('TeamMembership', teamMembershipSchema);
-export default TeamMembership;
+module.exports = TeamMembership;

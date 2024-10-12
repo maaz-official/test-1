@@ -1,14 +1,13 @@
-import mongoose from 'mongoose';
-import { getConfig } from '../utils/helpers/config';
+const mongoose = require('mongoose');
+const { getConfig } = require('../utils/helpers/config');
+const logger = require('../utils/logging/logger');
 
 // MongoDB URI from environment variables, with fallback to localhost
 const mongoURI = getConfig('MONGO_URI', 'mongodb://localhost:27017/insport_app');
 
 // MongoDB connection options for performance tuning and scalability
 const mongooseOptions = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    poolSize: getConfig('MONGO_POOL_SIZE', 10), // Maximum number of connections in the pool
+    maxPoolSize: getConfig('MONGO_POOL_SIZE', 10), // Maximum number of connections in the pool
     connectTimeoutMS: getConfig('MONGO_CONNECT_TIMEOUT', 10000), // Timeout for initial connection (in ms)
     socketTimeoutMS: getConfig('MONGO_SOCKET_TIMEOUT', 45000), // Timeout for socket inactivity (in ms)
     autoIndex: false, // Disable auto-indexing in production for better performance
@@ -17,7 +16,7 @@ const mongooseOptions = {
 };
 
 // Function to connect to MongoDB with retry logic and advanced options
-export const connectDB = async () => {
+const connectDB = async () => {
     let retries = getConfig('MONGO_RETRY_LIMIT', 5); // Number of retries before giving up
     const retryDelay = getConfig('MONGO_RETRY_DELAY', 5000); // Delay between retries (in ms)
 
@@ -59,7 +58,7 @@ export const connectDB = async () => {
 };
 
 // Handle graceful shutdown and close the MongoDB connection
-const gracefulShutdown = async () => {
+const gracefulDBShutdown = async () => {
     try {
         await mongoose.connection.close();
         logger.info('MongoDB connection closed gracefully');
@@ -71,5 +70,6 @@ const gracefulShutdown = async () => {
 };
 
 // Listen for termination signals to handle graceful shutdown
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulDBShutdown);
+process.on('SIGTERM', gracefulDBShutdown);
+module.exports = { connectDB, gracefulDBShutdown };

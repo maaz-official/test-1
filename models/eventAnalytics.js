@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 // Event Analytics Schema
 const eventAnalyticsSchema = new mongoose.Schema({
@@ -86,4 +86,4 @@ eventAnalyticsSchema.pre('save', function (next) {
 
 // EventAnalytics Model
 const EventAnalytics = mongoose.model('EventAnalytics', eventAnalyticsSchema);
-export default EventAnalytics;
+module.exports = EventAnalytics;

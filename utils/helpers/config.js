@@ -1,4 +1,4 @@
-const { HttpStatus, apiError } = require('../api/apiError');
+const { HttpStatus, ApiError } = require('../api/apiError');
 
 require('dotenv').config();
 
@@ -18,7 +18,7 @@ const getConfig = (key, defaultValue) => {
         if (defaultValue !== undefined) {
             return defaultValue;  // Return default value if provided
         }
-        throw new apiError(HttpStatus.INTERNAL_SERVER_ERROR, `Missing configuration for key: ${key}`);
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, `Missing configuration for key: ${key}`);
     }
 
     return value;

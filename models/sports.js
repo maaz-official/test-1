@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 const ICON_URL_REGEX = /^(http|https):\/\/[^\s]+$/;
 
 // Schema Definition
@@ -89,4 +88,4 @@ sportSchema.statics.getAllSportsWithEventCounts = async function () {
 };
 
 const Sport = mongoose.model('Sport', sportSchema);
-export default Sport;
+module.exports = Sport;
