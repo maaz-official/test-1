@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 
-
 const userProfileSchema = new mongoose.Schema({
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -67,7 +66,7 @@ const userProfileSchema = new mongoose.Schema({
   language_preference: {
     type: String,
     default: 'en',
-    enum: ['en', 'es', 'fr', 'de', 'zh', 'ja'] // Example of supported languages
+    enum: ['en', 'es', 'fr', 'de', 'zh', 'ja'] 
   },
   location: {
     type: {
@@ -92,16 +91,16 @@ const userProfileSchema = new mongoose.Schema({
   },
   created_by: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // The user who created the profile
+    ref: 'User', 
     index: true
   },
   updated_by: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User' // The user who last updated the profile
+    ref: 'User' 
   },
   version: {
     type: Number,
-    default: 1 // For basic versioning of the profile
+    default: 1
   }
 });
 

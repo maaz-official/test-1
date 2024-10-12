@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const morgan = require('morgan'); 
+const cookieParser = require('cookie-parser');
 
 const logger = require('./utils/logging/logger.js'); 
 const { getConfig } = require('./utils/helpers/config.js'); 
@@ -22,6 +23,7 @@ const app = express();
 app.use(cors()); // Enable CORS
 app.use(helmet()); // Add Helmet for HTTP security headers
 app.use(compression()); // Add compression to improve response times
+app.use(cookieParser());
 
 // Limit repeated requests to public APIs
 const limiter = rateLimit({

@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
-const { getAllConfig } = require('./path/to/config'); // Adjust the path accordingly
-const ApiError = require('../api/apiError');
+const { getAllConfig } = require('../helpers/config');
 
 /**
  * Sends an email using Nodemailer.
@@ -12,7 +11,6 @@ const ApiError = require('../api/apiError');
  * @param {Array<string>} [options.cc] - CC email addresses (optional).
  * @param {Array<string>} [options.bcc] - BCC email addresses (optional).
  * @param {Array<Object>} [options.attachments] - Email attachments (optional).
- * @throws {ApiError} - Throws an error if email sending fails.
  */
 const sendEmail = async ({
     to,
@@ -23,7 +21,7 @@ const sendEmail = async ({
     bcc = [],
     attachments = [],
 }) => {
-    const config = getAllConfig(); // Get the configuration object
+    const config = getAllConfig();
     const transporter = nodemailer.createTransport({
         host: config.smtp.host,
         port: config.smtp.port,
@@ -49,7 +47,7 @@ const sendEmail = async ({
         const info = await transporter.sendMail(mailOptions);
         console.log('Email sent: %s', info.messageId); // Log message ID for reference
     } catch (error) {
-        throw new ApiError(500, 'Email sending failed: ' + error.message);
+        throw error;
     }
 };
 

@@ -18,8 +18,8 @@ const logDirectory = path.join(__dirname, 'logs');
 const consoleFormat = winston.format.printf(({ level, message, timestamp, stack }) => {
     const separator = '\n----------------------------------------\n';
     return stack
-        ? `${separator}${timestamp} [${level.toUpperCase()}]: ${message}\n${stack}${separator}`
-        : `${separator}${timestamp} [${level.toUpperCase()}]: ${message}${separator}`;
+        ? `${separator}${timestamp} ${level.toUpperCase()} ${message}\n${stack}${separator}`
+        : `${separator}${timestamp} ${level.toUpperCase()} ${message}${separator}`;
 });
 
 // Create a Winston logger with different configurations based on environment

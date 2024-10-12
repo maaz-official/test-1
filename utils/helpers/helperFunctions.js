@@ -1,3 +1,6 @@
+const { User } = require("../../models");
+const crypto = require('crypto');
+
 /**
  * Capitalizes the first letter of a string.
  * @param {string} str - String to capitalize.
@@ -43,7 +46,65 @@ const toTitleCaseAdvanced = (str, delimiter = ' ') => {
         .join(delimiter);
 };
 
-module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced };
+const parseCookies = (cookieHeader) => {
+    if (!cookieHeader) return {};
+
+    return cookieHeader.split(';').reduce((cookies, cookieStr) => {
+        const [name, ...rest] = cookieStr.split('=');
+        const trimmedName = name?.trim(); // Trim whitespace around the cookie name
+
+        if (!trimmedName) return cookies; // Skip malformed cookies with no name
+
+        const value = rest.join('=').trim(); // Rejoin and trim any potential '=' in the value
+        try {
+            cookies[trimmedName] = decodeURIComponent(value); // Decode URL-encoded values
+        } catch (e) {
+            // Handle decoding errors gracefully and skip the cookie if necessary
+            console.warn(`Failed to decode cookie value: ${value}`, e);
+        }
+        return cookies;
+    }, {});
+};
+
+const generateUsername = async (first_name, last_name, maxAttempts = 5) => {
+    try {
+        // Sanitize and generate the base username
+        const baseUsername = `${first_name.trim().toLowerCase()}_${last_name.trim().toLowerCase()}`.replace(/\s+/g, '');
+        let username = baseUsername;
+
+        let attempts = 0;
+        let isUnique = false;
+
+        while (!isUnique && attempts < maxAttempts) {
+            // Check if the username already exists
+            const existingUser = await User.findOne({ username });
+
+            if (!existingUser) {
+                isUnique = true; // Username is unique, break the loop
+            } else {
+                // Generate a new username with a random numeric suffix
+                const randomSuffix = crypto.randomInt(1000, 9999); // Generate a 4-digit random number
+                username = `${baseUsername}_${randomSuffix}`;
+            }
+
+            attempts += 1;
+        }
+
+        if (!isUnique) {
+            throw new Error(`Failed to generate a unique username after ${maxAttempts} attempts.`);
+        }
+
+        logger.info(`Generated unique username: ${username}`);
+        return username;
+
+    } catch (error) {
+        logger.error(`Error generating username: ${error.message}`);
+        throw error;
+    }
+};
+
+
+module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced, parseCookies, generateUsername};
 
 // console.log(capitalizeFirstLetter('hello world')); // Output: Hello world
 // console.log(toTitleCase('hello world')); // Output: Hello World

@@ -3,6 +3,7 @@ const redis = require('../cache/redisClient');
 const { Vonage } = require('@vonage/server-sdk');
 const logger = require('../logging/logger'); 
 const { getConfig } = require('../helpers/config');
+const { ApiError, HttpStatus } = require('../api/apiError');
 
 // Initialize Vonage client with your API key and secret
 const vonage = new Vonage({
@@ -53,7 +54,7 @@ const generateOtp = (length = OTP_LENGTH) => {
 };
 
 /**
- * Send OTP to the provided phone number using Nexmo (Vonage).
+ * Send OTP to the provided phone number using Vonage.
  * @param {string} phone - The phone number to send OTP to.
  * @param {string} otp - The OTP code to send.
  */
@@ -65,10 +66,7 @@ const sendOtp = async (phone, otp) => {
             from: getConfig('VONAGE_FROM_NUMBER'),
             text: `Your verification code is ${otp}`,
         });
-
-        logger.info(`OTP sent to phone number ${phone}`);
-
-        // Encrypt and store OTP in Redis with expiration time
+        
         const encryptedOtp = encryptOtp(otp);
         await redis.setex(`otp:${phone}`, OTP_EXPIRATION, encryptedOtp);
 
@@ -77,8 +75,9 @@ const sendOtp = async (phone, otp) => {
 
         return { message: 'OTP sent successfully', phone };
     } catch (error) {
+        console.trace('Error caught during sendOtp function execution');
         logger.error(`Error sending OTP to ${phone}: ${error.message}`);
-        throw new Error('Failed to send OTP');
+        throw error;
     }
 };
 
@@ -93,13 +92,13 @@ const verifyOtp = async (phone, otp) => {
         // Get the encrypted OTP from Redis
         const encryptedOtp = await redis.get(`otp:${phone}`);
         if (!encryptedOtp) {
-            throw new Error('OTP not found or expired');
+            throw new ApiError(HttpStatus.NOT_FOUND, 'OTP not found or expired');
         }
 
         // Decrypt and verify OTP
         const storedOtp = decryptOtp(encryptedOtp);
         if (storedOtp !== otp) {
-            throw new Error('Invalid OTP');
+            throw new ApiError(HttpStatus.UNAUTHORIZED, 'Invalid OTP');
         }
 
         // OTP verified, delete from Redis to prevent reuse
@@ -109,7 +108,7 @@ const verifyOtp = async (phone, otp) => {
         return true;
     } catch (error) {
         logger.error(`OTP verification failed for ${phone}: ${error.message}`);
-        throw new Error('OTP verification failed');
+        throw error;
     }
 };
 
@@ -122,7 +121,7 @@ const resendOtp = async (phone) => {
         // Check if OTP was requested recently (rate limiting)
         const lastRequest = await redis.get(`otp:rate_limit:${phone}`);
         if (lastRequest && Date.now() - lastRequest < OTP_RESEND_INTERVAL * 1000) {
-            throw new Error(`OTP was recently sent. Please wait ${OTP_RESEND_INTERVAL / 60} minutes.`);
+            throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, `OTP was recently sent. Please wait ${OTP_RESEND_INTERVAL / 60} minutes.`);
         }
 
         // Generate a new OTP and send it
@@ -131,14 +130,14 @@ const resendOtp = async (phone) => {
         return { message: 'OTP resent successfully', phone };
     } catch (error) {
         logger.error(`Error resending OTP to ${phone}: ${error.message}`);
-        throw new Error('Failed to resend OTP');
+        throw error;
     }
 };
 
 /**
  * Apply rate limiting for OTP requests to prevent abuse.
  * @param {string} phone - The phone number making the OTP request.
- * @throws {Error} - Throws an error if rate limit exceeded.
+ * @throws {ApiError} - Throws an error if rate limit exceeded.
  */
 const applyOtpRateLimit = async (phone) => {
     const requests = await redis.incr(`otp:requests:${phone}`);
@@ -147,7 +146,7 @@ const applyOtpRateLimit = async (phone) => {
         await redis.expire(`otp:requests:${phone}`, 300);
     }
     if (requests > OTP_RATE_LIMIT) {
-        throw new Error('Too many OTP requests. Please try again later.');
+        throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'Too many OTP requests. Please try again later.');
     }
 };
 

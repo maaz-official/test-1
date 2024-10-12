@@ -14,7 +14,9 @@ const Team = require('./team');
 const TeamMembership = require('./teamMembership');
 const UserFavoriteSport = require('./userFavoriteSport');
 const UserProfile = require('./userProfile');
-const { default: User } = require('./users');
+const User = require('./users');
+const OtpVerification = require('./otpVerifications');
+
 
 // Export all models
 module.exports = {
@@ -30,6 +32,7 @@ module.exports = {
     TeamMembership,
     UserFavoriteSport,
     UserProfile,
-    User
+    User,
+    OtpVerification
 };
 
