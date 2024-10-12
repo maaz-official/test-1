@@ -1,15 +1,13 @@
-﻿
-// AuthService.js
-// This service handles all authentication-related business logic (signup, login, token management).
-const { generateOtp, sendOtp, verifyOtp, applyOtpRateLimit } = require('../utils/auth/otpService');
-const bcrypt = require('bcrypt');
-const redis = require('../utils/cache/redisClient'); 
+﻿const { generateOtp, sendOtp, verifyOtp, applyOtpRateLimit } = require('../utils/auth/otpService');
+const argon2 = require('argon2');
+const redis = require('../utils/cache/redisClient');
 const logger = require('../utils/logging/logger');
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { User } = require('../models');
 const { ApiError } = require('../utils/api/apiError');
 const { getConfig } = require('../utils/helpers/config');
+const { User } = require('../models');
+const { sendEmail } = require('../utils/mail/mailer');
 
 // OTP and other expiration times from config
 const OTP_EXPIRATION = getConfig('OTP_EXPIRATION', 300); // 5 minutes
@@ -22,8 +20,8 @@ const ACCOUNT_CREATION_TOKEN_EXPIRATION = getConfig('ACCOUNT_CREATION_TOKEN_EXPI
  * @param {string} phone - Phone number for the account creation.
  * @returns {string} - Generated token.
  */
-const generateAccountCreationToken = (phone) => {
-    return jwt.sign({ phone }, getConfig('JWT_SECRET'), { expiresIn: ACCOUNT_CREATION_TOKEN_EXPIRATION });
+const generateAccountCreationToken = (otpTarget) => {
+    return jwt.sign({ otpTarget }, getConfig('JWT_SECRET'), { expiresIn: ACCOUNT_CREATION_TOKEN_EXPIRATION });
 };
 
 /**
@@ -32,15 +30,24 @@ const generateAccountCreationToken = (phone) => {
  */
 exports.createAccount = async ({ email, phone }) => {
     try {
-        // Check if the user already exists by email or phone
+        if (!email && !phone) {
+            throw new ApiError(400, 'Either email or phone must be provided');
+        }
+        if (email && phone) {
+            throw new ApiError(400, 'Only one of email or phone must be provided, not both');
+        }
         let user;
+        // Query if email is provided
         if (email) {
             user = await User.findOne({ email });
             if (user) {
                 logger.warn(`Attempt to create account with existing email: ${email}`);
                 throw new ApiError(400, 'User with this email already exists');
             }
-        } else if (phone) {
+        }
+
+        // Query if phone is provided
+        if (phone) {
             user = await User.findOne({ phone_number: phone });
             if (user) {
                 logger.warn(`Attempt to create account with existing phone: ${phone}`);
@@ -49,59 +56,65 @@ exports.createAccount = async ({ email, phone }) => {
         }
 
         // Apply rate limiting for OTP requests
+        const otpTarget = phone || email;
+        await applyOtpRateLimit(otpTarget);
+
+        // Send OTP
+        const otp = generateOtp();
+        console.log("🚀 ~ OTP:", otp);
         if (phone) {
-            await applyOtpRateLimit(phone);
+            // await sendOtp(phone, otp); // Implement OTP sending for phone
+        } else if (email) {
+            await sendEmail({
+                to: email,
+                subject: 'Your OTP Code',
+                text: `Your OTP code is: ${otp}`,
+                html: `<p>Your OTP code is: <strong>${otp}</strong></p>`,
+            });
         }
 
-        // If phone provided, generate OTP and send it
-        if (phone) {
-            const otp = generateOtp();
-            await sendOtp(phone, otp);
+        await redis.setex(`otp:${otpTarget}`, OTP_EXPIRATION, otp);
 
-            // Store the phone number in Redis for 10 minutes and generate a token to resume the flow
-            const accountCreationToken = generateAccountCreationToken(phone);
-            await redis.setex(`createAccount:${phone}`, USER_TEMP_DATA_EXPIRATION, JSON.stringify({ phone }));
-
-            logger.info(`OTP sent for phone number: ${phone}, account creation token generated`);
-            return { message: 'OTP sent', phone, token: accountCreationToken };
-        }
-
-        // If email provided, proceed to details entry directly
-        return { message: 'Account creation initiated', email };
+        return { message: 'OTP sent', otpTarget };
 
     } catch (error) {
-        logger.error(`Error in createAccount: ${error.message}`);
+        logger.error(`Error in requestOtp: ${error.message}`);
         throw error;
     }
 };
+
 
 /**
  * Service logic for OTP verification.
  * Step 2: Verifies OTP and proceeds to details entry. Supports token-based flow resumption.
  */
-exports.verifyOtp = async ({ phone, otp, token }) => {
+exports.verifyOtp = async ({ otpTarget, otp }) => {
     try {
-        // Validate JWT token to resume flow if present
-        if (token) {
-            jwt.verify(token, getConfig('JWT_SECRET'));
-        }
-
-        const isValid = await verifyOtp(phone, otp);
-        if (!isValid) {
+        // Step 1: Retrieve the stored OTP from Redis and compare with the provided OTP
+        const storedOtp = await redis.get(`otp:${otpTarget}`);
+        if (!storedOtp || storedOtp !== otp) {
             throw new ApiError(400, 'Invalid or expired OTP');
         }
+        console.log("🚀 ~ exports.verifyOtp= ~ otpTarget:", otpTarget)
 
-        // Store the verified phone number in Redis with a longer expiration to proceed to details entry
-        await redis.setex(`verifiedPhone:${phone}`, USER_TEMP_DATA_EXPIRATION, phone);
+        // Step 2: OTP is valid, generate the account creation token
+        const accountCreationToken = jwt.sign({ otpTarget }, getConfig('JWT_SECRET'), {
+            expiresIn: ACCOUNT_CREATION_TOKEN_EXPIRATION,
+        });
 
-        logger.info(`OTP verified for phone number: ${phone}`);
-        return { message: 'OTP verified', phone };
+        // Step 3: Store the verified otpTarget (email/phone) in Redis for further steps
+        await redis.setex(`verified:${otpTarget}`, USER_TEMP_DATA_EXPIRATION, otpTarget);
+
+        // Log success and return success message (no token in body)
+        logger.info(`OTP verified for ${otpTarget}`);
+        return { message: 'OTP verified', otpTarget, token: accountCreationToken };
 
     } catch (error) {
-        logger.error(`OTP verification failed for phone ${phone}: ${error.message}`);
+        logger.error(`OTP verification failed for ${otpTarget}: ${error.message}`);
         throw error;
     }
 };
+
 
 /**
  * Service logic for user details entry.
@@ -109,39 +122,61 @@ exports.verifyOtp = async ({ phone, otp, token }) => {
  */
 exports.enterDetails = async ({ first_name, last_name, email, phone, token }) => {
     try {
-        // Validate JWT token if flow is resumed
+        // Step 1: Validate the JWT token if flow is resumed
         if (token) {
             jwt.verify(token, getConfig('JWT_SECRET'));
         }
 
-        // Validation logic for required fields
-        if (!first_name || !last_name || !email || !phone) {
-            throw new ApiError(400, 'All fields are required');
+        // Step 2: Ensure one of the data (email or phone) was already verified
+        const verifiedPhone = phone ? await redis.get(`verified:${phone}`) : null;
+        const verifiedEmail = email ? await redis.get(`verified:${email}`) : null;
+
+        // If neither phone nor email is verified, throw an error
+        if (!verifiedPhone && !verifiedEmail) {
+            throw new ApiError(400, 'Phone or email must be verified first');
         }
 
-        // Check if the phone was previously verified
-        const verifiedPhone = await redis.get(`verifiedPhone:${phone}`);
-        if (!verifiedPhone) {
-            throw new ApiError(400, 'Phone number not verified');
+        // Step 3: If the provided email is not verified, send OTP for verification
+        if (!verifiedEmail && email) {
+            const otp = generateOtp();
+            console.log("🚀 ~ sendEmail= ~ otp:", otp)
+            // await sendEmail({
+            //     to: email,
+            //     subject: 'Your OTP Code',
+            //     text: `Your OTP code is: ${otp}`,
+            //     html: `<p>Your OTP code is: <strong>${otp}</strong></p>`,
+            // }); 
+            logger.info(`OTP sent to email: ${email} for verification`);
+            return { message: 'OTP sent to email for verification', email };
         }
 
-        // Store user details temporarily in Redis before finalizing the account
-        await redis.setex(`userDetails:${phone}`, USER_TEMP_DATA_EXPIRATION, JSON.stringify({ first_name, last_name, email, phone }));
+        // Step 4: If the provided phone is not verified, send OTP for verification
+        if (!verifiedPhone && phone) {
+            const otp = generateOtp();
+            await sendOtp(phone, otp);  
+            logger.info(`OTP sent to phone: ${phone} for verification`);
+            return { message: 'OTP sent to phone for verification', phone };
+        }
 
-        logger.info(`User details accepted for phone: ${phone}`);
+        // Step 5: Store user details temporarily in Redis before finalizing the account
+        const otpTarget = phone || email;
+        await redis.setex(`userDetails:${otpTarget}`, USER_TEMP_DATA_EXPIRATION, JSON.stringify({ first_name, last_name, email, phone }));
+
+        logger.info(`User details accepted for ${otpTarget}`);
         return { message: 'Details accepted', email, phone };
 
     } catch (error) {
-        logger.error(`Error in enterDetails for phone ${phone}: ${error.message}`);
+        logger.error(`Error in enterDetails: ${error.message}`);
         throw error;
     }
 };
+
 
 /**
  * Service logic for setting password.
  * Step 4: Set the password and finalize the account creation. Atomic transaction for user creation.
  */
-exports.setPassword = async ({ phone, password, confirmPassword, token }) => {
+exports.setPassword = async ({ otpTarget, password, confirmPassword, token }) => {
     try {
         // Validate JWT token if flow is resumed
         if (token) {
@@ -154,17 +189,17 @@ exports.setPassword = async ({ phone, password, confirmPassword, token }) => {
         }
 
         // Retrieve user details from Redis
-        const userDetails = await redis.get(`userDetails:${phone}`);
+        const userDetails = await redis.get(`userDetails:${otpTarget}`);
         if (!userDetails) {
             throw new ApiError(400, 'User details not found or expired');
         }
 
-        const { first_name, last_name, email } = JSON.parse(userDetails);
+        const { first_name, last_name, email, phone } = JSON.parse(userDetails);
 
-        // Hash the password with bcrypt
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Hash the password with Argon2
+        const hashedPassword = await argon2.hash(password, { type: argon2.argon2id });
 
-        // Start an atomic transaction to ensure that user creation is successful
+        // Atomic transaction to ensure that user creation is successful
         const session = await User.startSession();
         session.startTransaction();
 
@@ -181,27 +216,27 @@ exports.setPassword = async ({ phone, password, confirmPassword, token }) => {
             await user.save({ session });
 
             // Clean up Redis entries after successful creation
-            await redis.del(`createAccount:${phone}`);
-            await redis.del(`verifiedPhone:${phone}`);
-            await redis.del(`userDetails:${phone}`);
+            await redis.del(`createAccount:${otpTarget}`);
+            await redis.del(`verified:${otpTarget}`);
+            await redis.del(`userDetails:${otpTarget}`);
 
             // Commit the transaction
             await session.commitTransaction();
             session.endSession();
 
-            logger.info(`User created successfully for phone: ${phone}`);
+            logger.info(`User created successfully for ${otpTarget}`);
             return { message: 'Account created successfully', user };
 
         } catch (transactionError) {
-            // Rollback the transaction in case of failure
             await session.abortTransaction();
             session.endSession();
-            logger.error(`Transaction failed during user creation for phone ${phone}: ${transactionError.message}`);
+            logger.error(`Transaction failed: ${transactionError.message}`);
             throw new ApiError(500, 'User creation failed, please try again later');
         }
 
     } catch (error) {
-        logger.error(`Error in setPassword for phone ${phone}: ${error.message}`);
+        logger.error(`Error in setPassword for ${otpTarget}: ${error.message}`);
         throw error;
     }
 };
+

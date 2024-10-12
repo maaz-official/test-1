@@ -43,7 +43,26 @@ const toTitleCaseAdvanced = (str, delimiter = ' ') => {
         .join(delimiter);
 };
 
-module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced };
+const parseCookies = (cookieHeader) => {
+    if (!cookieHeader) return {};
+
+    return cookieHeader.split(';').reduce((cookies, cookieStr) => {
+        const [name, ...rest] = cookieStr.split('=');
+        const trimmedName = name?.trim(); // Trim whitespace around the cookie name
+
+        if (!trimmedName) return cookies; // Skip malformed cookies with no name
+
+        const value = rest.join('=').trim(); // Rejoin and trim any potential '=' in the value
+        try {
+            cookies[trimmedName] = decodeURIComponent(value); // Decode URL-encoded values
+        } catch (e) {
+            // Handle decoding errors gracefully and skip the cookie if necessary
+            console.warn(`Failed to decode cookie value: ${value}`, e);
+        }
+        return cookies;
+    }, {});
+};
+module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced, parseCookies};
 
 // console.log(capitalizeFirstLetter('hello world')); // Output: Hello world
 // console.log(toTitleCase('hello world')); // Output: Hello World

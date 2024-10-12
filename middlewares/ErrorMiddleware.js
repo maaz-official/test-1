@@ -7,7 +7,7 @@
 const errorMiddleware = (err, req, res, next) => {
   let statusCode = err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
   let errorMessage = err.message || 'An unexpected error occurred';
-  let errorType = err.type || 'GeneralError';
+  let errorType = err.type || 'ApiError';
   let errorDetails = null;
 
   // MongoDB Duplicate Key Error

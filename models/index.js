@@ -14,7 +14,7 @@ const Team = require('./team');
 const TeamMembership = require('./teamMembership');
 const UserFavoriteSport = require('./userFavoriteSport');
 const UserProfile = require('./userProfile');
-const { default: User } = require('./users');
+const User = require('./users');
 
 // Export all models
 module.exports = {

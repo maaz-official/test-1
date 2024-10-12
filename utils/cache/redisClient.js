@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const { getConfig } = require('../helpers/config');
+const logger = require('../logging/logger');
 
 const redisConfig = {
     host: getConfig('REDIS_HOST'),
@@ -7,17 +8,14 @@ const redisConfig = {
     password: getConfig('REDIS_PASSWORD'),
     db: getConfig('REDIS_DB', 0), 
     retryStrategy: (times) => {
-        // retry after 2 seconds
         return Math.min(times * 50, 2000);
     },
 };
 
-// Initialize Redis client
 const redis = new Redis(redisConfig);
 
-// Handle Redis connection events
 redis.on('connect', () => {
-    console.log('Connected to Redis');
+    logger.info('Redis connected successfully');
 });
 
 redis.on('error', (err) => {

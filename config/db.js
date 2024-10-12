@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { getConfig } = require('../utils/helpers/config');
 const logger = require('../utils/logging/logger');
+const bootstrapAdmin = require('../utils/auth/bootstrapAdmin');
 
 // MongoDB URI from environment variables, with fallback to localhost
 const mongoURI = getConfig('MONGO_URI', 'mongodb://localhost:27017/insport_app');
@@ -41,15 +42,15 @@ const connectDB = async () => {
             mongoose.connection.on('reconnected', () => {
                 logger.info('MongoDB reconnected successfully');
             });
-
-            return; // Exit the function when connected successfully
+            await bootstrapAdmin();
+            return; 
         } catch (error) {
             retries -= 1;
             logger.error(`MongoDB connection error: ${error.message}. Retrying in ${retryDelay / 1000}s... (${retries} retries left)`);
 
             if (retries === 0) {
                 logger.error('MongoDB connection failed after multiple attempts. Exiting...');
-                process.exit(1); // Exit process if all retries fail
+                process.exit(1); 
             }
 
             await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
@@ -57,19 +58,17 @@ const connectDB = async () => {
     }
 };
 
-// Handle graceful shutdown and close the MongoDB connection
 const gracefulDBShutdown = async () => {
     try {
         await mongoose.connection.close();
         logger.info('MongoDB connection closed gracefully');
-        process.exit(0); // Exit gracefully after closing the connection
+        process.exit(0);
     } catch (error) {
         logger.error(`Error during MongoDB graceful shutdown: ${error.message}`);
-        process.exit(1); // Exit with failure if there is an error
+        process.exit(1);
     }
 };
 
-// Listen for termination signals to handle graceful shutdown
 process.on('SIGINT', gracefulDBShutdown);
 process.on('SIGTERM', gracefulDBShutdown);
 module.exports = { connectDB, gracefulDBShutdown };
