@@ -1,7 +1,7 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-import validator from 'validator'; // Assuming you're using 'validator' for validation
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const validator = require('validator');
 
 // Constants
 const SALT_WORK_FACTOR = 12;  // Increased salt rounds for stronger security
@@ -188,4 +188,4 @@ userSchema.methods.resetLoginAttempts = async function() {
 };
 
 const User = mongoose.model('User', userSchema);
-export default User;
+module.exports = User;

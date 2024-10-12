@@ -1,5 +1,6 @@
-import mongoose from 'mongoose';
-import validator from 'validator';
+const mongoose = require('mongoose');
+const validator = require('validator');
+
 
 const userProfileSchema = new mongoose.Schema({
   user_id: {
@@ -127,4 +128,4 @@ userProfileSchema.index({ first_name: 1, last_name: 1 });
 userProfileSchema.index({ country: 1, experience_level: 1 });
 
 const UserProfile = mongoose.model('UserProfile', userProfileSchema);
-export default UserProfile;
+module.exports = UserProfile;

@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Validations
 const MAX_MEMBERS_LIMIT = 100; // Set a reasonable limit for max members
 
@@ -91,4 +90,4 @@ teamSchema.statics.updateTeam = async function (teamId, updates) {
 
 // Export the Team Model
 const Team = mongoose.model('Team', teamSchema);
-export default Team;
+module.exports = Team;

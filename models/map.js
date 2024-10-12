@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Validations
 const COORDINATE_RANGE = {
   LATITUDE: { MIN: -90, MAX: 90 },
@@ -128,4 +127,4 @@ mapSchema.methods.getDetails = function () {
 
 // Export the Map Model
 const Map = mongoose.model('Map', mapSchema);
-export default Map;
+module.exports = Map;

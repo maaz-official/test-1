@@ -20,11 +20,11 @@ router.post('/set-password', AuthController.setPassword);
 
 
 
-// Route to handle user login
-router.post('/login', AuthController.login);
+// // Route to handle user login
+// router.post('/login', AuthController.login);
 
-// Route to handle user logout
-router.post('/logout', AuthController.logout);
+// // Route to handle user logout
+// router.post('/logout', AuthController.logout);
 
 module.exports = router;
 

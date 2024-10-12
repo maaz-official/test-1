@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+const mongoose = require('mongoose');
 // Constants for Validations
 const MAX_RATING = 5;
 const MIN_RATING = 1;
@@ -116,4 +115,4 @@ reviewSchema.statics.getReviewsWithUsers = async function (eventId) {
 
 // Export the Review Model
 const Review = mongoose.model('Review', reviewSchema);
-export default Review;
+module.exports = Review;
