@@ -2,14 +2,17 @@ const winston = require('winston');
 const path = require('path');
 const DailyRotateFile = require('winston-daily-rotate-file');
 
+// Detect if the environment is Vercel or production
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'production';
+
 // Define log file paths for better organization
 const logDirectory = path.join(__dirname, 'logs');
 
-// Ensure log directory exists or create it
-const fs = require('fs');
-if (!fs.existsSync(logDirectory)) {
-    fs.mkdirSync(logDirectory);
-}
+// Ensure log directory exists or create it (commented out for Vercel's read-only file system)
+// const fs = require('fs');
+// if (!fs.existsSync(logDirectory)) {
+//     fs.mkdirSync(logDirectory);
+// }
 
 // Custom format for console output in development
 const consoleFormat = winston.format.printf(({ level, message, timestamp, stack }) => {
@@ -25,10 +28,10 @@ const logger = winston.createLogger({
     format: winston.format.combine(
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), // Timestamp format
         winston.format.errors({ stack: true }), // Include stack trace for errors
-        winston.format.json() // Default JSON format for file logs
+        winston.format.json() // Default JSON format for logs
     ),
     transports: [
-        // Console transport for human-readable logs in development
+        // Console transport for human-readable logs in development and production
         new winston.transports.Console({
             level: process.env.NODE_ENV === 'production' ? 'error' : 'debug',
             format: process.env.NODE_ENV === 'production'
@@ -42,45 +45,47 @@ const logger = winston.createLogger({
                 )
         }),
 
+        // Commented out file-based logging for environments with read-only file systems like Vercel
         // Daily rotation for all logs in JSON format for file storage
-        new DailyRotateFile({
-            filename: path.join(logDirectory, 'combined-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '14d', // Keep logs for 14 days
-            level: 'info', // Log all levels from info and above
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json() // JSON format for file storage
-            )
-        }),
+        // new DailyRotateFile({
+        //     filename: path.join(logDirectory, 'combined-%DATE%.log'),
+        //     datePattern: 'YYYY-MM-DD',
+        //     maxSize: '20m',
+        //     maxFiles: '14d', // Keep logs for 14 days
+        //     level: 'info', // Log all levels from info and above
+        //     format: winston.format.combine(
+        //         winston.format.timestamp(),
+        //         winston.format.json() // JSON format for file storage
+        //     )
+        // }),
 
         // Separate error logs in JSON format for file storage
-        new DailyRotateFile({
-            filename: path.join(logDirectory, 'error-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '30d', // Keep error logs for 30 days
-            level: 'error', // Only log error messages
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json() // JSON format for file storage
-            )
-        })
+        // new DailyRotateFile({
+        //     filename: path.join(logDirectory, 'error-%DATE%.log'),
+        //     datePattern: 'YYYY-MM-DD',
+        //     maxSize: '20m',
+        //     maxFiles: '30d', // Keep error logs for 30 days
+        //     level: 'error', // Only log error messages
+        //     format: winston.format.combine(
+        //         winston.format.timestamp(),
+        //         winston.format.json() // JSON format for file storage
+        //     )
+        // })
     ],
 
     // Handle uncaught exceptions globally
     exceptionHandlers: [
-        new DailyRotateFile({
-            filename: path.join(logDirectory, 'exceptions-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '30d', // Keep exception logs for 30 days
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json() // JSON for file logs
-            )
-        }),
+        // Commented out file-based exception handling for read-only environments
+        // new DailyRotateFile({
+        //     filename: path.join(logDirectory, 'exceptions-%DATE%.log'),
+        //     datePattern: 'YYYY-MM-DD',
+        //     maxSize: '20m',
+        //     maxFiles: '30d', // Keep exception logs for 30 days
+        //     format: winston.format.combine(
+        //         winston.format.timestamp(),
+        //         winston.format.json() // JSON for file logs
+        //     )
+        // }),
         new winston.transports.Console({
             format: winston.format.combine(
                 winston.format.colorize(),
@@ -91,16 +96,17 @@ const logger = winston.createLogger({
 
     // Handle unhandled promise rejections globally
     rejectionHandlers: [
-        new DailyRotateFile({
-            filename: path.join(logDirectory, 'rejections-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '30d', // Keep rejection logs for 30 days
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json() // JSON for file logs
-            )
-        }),
+        // Commented out file-based rejection handling for read-only environments
+        // new DailyRotateFile({
+        //     filename: path.join(logDirectory, 'rejections-%DATE%.log'),
+        //     datePattern: 'YYYY-MM-DD',
+        //     maxSize: '20m',
+        //     maxFiles: '30d', // Keep rejection logs for 30 days
+        //     format: winston.format.combine(
+        //         winston.format.timestamp(),
+        //         winston.format.json() // JSON for file logs
+        //     )
+        // }),
         new winston.transports.Console({
             format: winston.format.combine(
                 winston.format.colorize(),
