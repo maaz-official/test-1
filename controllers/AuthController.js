@@ -94,3 +94,43 @@ exports.enterDetails = async (req, res, next) => {
         next(error);
     }
 };
+
+
+// Login - allows login with email or phone
+exports.login = async (req, res, next) => {
+    try {
+        const { email, phone, password } = req.body;
+
+        // Call AuthService to handle login
+        const { token, user } = await AuthService.login({ email, phone, password });
+
+        // Set token in HTTP-only cookie
+        res.cookie('authToken', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Strict',
+            maxAge: ACCOUNT_CREATION_TOKEN_EXPIRATION * 10000, // 30 minutes
+        });
+
+        // Respond with success
+        res.status(200).json({ message: 'Login successful', user });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Logout - clears JWT cookie
+exports.logout = async (req, res, next) => {
+    try {
+        // Clear the auth token cookie
+        res.clearCookie('authToken', {
+            httpOnly: true,
+            sameSite: 'Strict',
+            secure: process.env.NODE_ENV === 'production'
+        });
+
+        res.status(200).json({ message: 'Logout successful' });
+    } catch (error) {
+        next(error);
+    }
+};

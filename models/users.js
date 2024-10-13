@@ -30,6 +30,10 @@ const userSchema = new mongoose.Schema({
       message: 'Invalid email format',
     },
   },
+  email_verified: { 
+    type: Boolean,
+    default: false,
+  },
   password_hash: {
     type: String,
     required: true,
@@ -129,7 +133,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return await argon2.verify(this.password_hash, candidatePassword);
 };
 
-// Password Reset Token Generation
+// Generate Password Reset Token
 userSchema.methods.generateResetPasswordToken = function () {
   const token = crypto.randomBytes(20).toString('hex');
   this.reset_password_token = crypto.createHash('sha256').update(token).digest('hex');

@@ -4,7 +4,7 @@ const { sendOtp } = require('../utils/auth/otpService');
 const { getConfig } = require('../utils/helpers/config');
 const jwt = require('jsonwebtoken');
 const argon2 = require('argon2');
-const { generateUsername } = require('../utils/helpers/helperFunctions');
+const { generateUsername, generateAuthToken } = require('../utils/helpers/helperFunctions');
 
 // JWT expiration time for account creation token
 const ACCOUNT_CREATION_TOKEN_EXPIRATION = getConfig('ACCOUNT_CREATION_TOKEN_EXPIRATION', 1800); // 30 minutes
@@ -132,4 +132,49 @@ exports.enterDetails = async ({ first_name, last_name, email, password, confirmP
         session.endSession();
         throw error;
     }
+};
+// Login service logic (handles both email and phone login, with brute-force protection)
+exports.login = async ({ email, phone, password }) => {
+    if (!password || (!email && !phone)) {
+        throw new ApiError(400, 'Password and either email or phone are required');
+    }
+
+    // Find user by email or phone
+    const user = email
+        ? await User.findOne({ email })
+        : await User.findOne({ phone_number: phone });
+
+    if (!user) {
+        throw new ApiError(400, 'Invalid credentials');
+    }
+
+    // Check if the account is locked
+    if (user.lock_until && user.lock_until > Date.now()) {
+        throw new ApiError(423, 'Account is temporarily locked due to too many failed login attempts');
+    }
+
+    // Check if email is verified if logging in with email
+    if (email && !user.email_verified) {
+        throw new ApiError(400, 'Email not verified');
+    }
+
+    // Verify password
+    const isPasswordMatch = await user.comparePassword(password);
+    if (!isPasswordMatch) {
+        await user.incrementLoginAttempts(); // Increment login attempts on failure
+        throw new ApiError(400, 'Invalid credentials');
+    }
+
+    // Reset login attempts on successful login
+    await user.resetLoginAttempts();
+
+    // Generate JWT token
+    const token = generateAuthToken(user._id);
+
+    return { token, user };
+};
+
+// Logout service logic
+exports.logout = async () => {
+    return { message: 'Logout successful' };
 };
