@@ -1,5 +1,7 @@
 const { User } = require("../../models");
 const crypto = require('crypto');
+const { getConfig } = require("./config");
+const jwt = require('jsonwebtoken');
 
 /**
  * Capitalizes the first letter of a string.
@@ -102,9 +104,13 @@ const generateUsername = async (first_name, last_name, maxAttempts = 5) => {
         throw error;
     }
 };
+const generateAuthToken = (userId) => {
+    return jwt.sign({ userId}, getConfig('JWT_SECRET'), {
+        expiresIn: getConfig('SESSION_EXPIRATION', 3600), // 1 hour session
+    });
+};
 
-
-module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced, parseCookies, generateUsername};
+module.exports = { capitalizeFirstLetter, toTitleCase, toTitleCaseAdvanced, parseCookies, generateUsername, generateAuthToken};
 
 // console.log(capitalizeFirstLetter('hello world')); // Output: Hello world
 // console.log(toTitleCase('hello world')); // Output: Hello World

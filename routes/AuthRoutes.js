@@ -16,10 +16,10 @@ router.post('/enter-details', AuthController.enterDetails);
 
 
 // // Route to handle user login
-// router.post('/login', AuthController.login);
+router.post('/login', AuthController.login);
 
 // // Route to handle user logout
-// router.post('/logout', AuthController.logout);
+router.post('/logout', AuthController.logout);
 
 module.exports = router;
 
