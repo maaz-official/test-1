@@ -96,7 +96,6 @@ exports.enterDetails = async ({ first_name, last_name, email, password, confirmP
     session.startTransaction();
 
     try {
-        // Create a new user with the provided details
         const user = new User({
             email,
             phone_number: phone,
@@ -106,12 +105,10 @@ exports.enterDetails = async ({ first_name, last_name, email, password, confirmP
             role: 'user'
         });
 
-        // Save the user
         await user.save({ session });
 
-        // Create a corresponding user profile (with default or empty fields)
         const userProfile = new UserProfile({
-            user_id: user._id, // Link to the User
+            user_id: user._id, 
             first_name: first_name,
             last_name: last_name,
             experience_level: 'beginner'
