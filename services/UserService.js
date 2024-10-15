@@ -10,16 +10,45 @@ const generateResetToken = () => {
     const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
     return { resetToken, tokenHash };
 };
+/**
+ * Fetch user and profile details based on user role and self-request.
+ * Admins will see more details, regular users will have restricted access to sensitive information.
+ * If the user is requesting their own profile, they get full details.
+ * @param {Object} currentUser - The current logged-in user (req.user).
+ * @param {string} userId - The ID of the user being fetched.
+ * @returns {Promise<Object>} - User and profile with selected fields.
+ */
+exports.getUserById = async (currentUser, userId) => {
+    // Check if the requesting user is fetching their own profile
+    const isSelfRequest = currentUser._id.toString() === userId;
 
-// Get user profile by ID
-exports.getUserProfile = async (userId) => {
-    const userProfile = await UserProfile.findOne({ user_id: userId })
-        .populate('user_id', 'email username role');
-    if (!userProfile) {
+    // Define fields to exclude based on the request type (admin/self vs others)
+    let userFieldsToExclude = '-password_hash -reset_password_token -reset_password_expires -two_factor_secret -login_attempts -lock_until';
+    let profileFieldsToExclude = '-privacy_settings.show_phone_number -address -created_by -updated_by -version';
+
+    if (!isSelfRequest && currentUser.role !== 'admin') {
+        // Limit data for non-admins when accessing other profiles
+        userFieldsToExclude += ' -phone_number -status -last_login';
+        profileFieldsToExclude += ' -location'; // Hide sensitive fields for others
+    }
+
+    // Define the query to fetch the user with populated profile and joined events
+    const user = await User.findById(userId)
+        .select(userFieldsToExclude) // Exclude sensitive user fields
+        .populate({
+            path: 'profile', // Populate profile
+            select: profileFieldsToExclude, // Exclude sensitive profile fields
+        });
+    if (!user) {
+        throw new ApiError(404, 'User not found');
+    }
+    if (!user.profile) {
         throw new ApiError(404, 'User profile not found');
     }
-    return userProfile;
+    return user;
 };
+
+
 
 // Update user profile by ID
 exports.updateUserProfile = async (userId, updateData, currentUser) => {
@@ -209,7 +238,5 @@ exports.listAllUsers = async () => {
             path: 'profile',
             select: '-privacy_settings.show_phone_number -address -location -created_by -updated_by -version',
         });
-
-    logger.info(`Listed all users`);
     return users;
 };
