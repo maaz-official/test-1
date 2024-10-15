@@ -1,15 +1,29 @@
 ﻿// UserController.js
 // Handles advanced features like password reset, 2FA, and account deactivation.
 
+const { default: mongoose } = require('mongoose');
 const { UserService } = require('../services');
 const { ApiError } = require('../utils/api/apiError');
 
-// Get user profile
-exports.getUserProfile = async (req, res, next) => {
+/**
+ * Get user and user profile by ID with role-based access and full data for self-request.
+ * Admins see more detailed information, regular users see limited data unless it's their own profile.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
+exports.getUserById = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const userProfile = await UserService.getUserProfile(userId);
-        res.status(200).json(userProfile);
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            throw new ApiError(400, 'Invalid user ID');
+        }
+        const currentUser = req.user;
+        // Fetch user and profile based on admin status and self-request
+        const user = await UserService.getUserById(currentUser, userId);
+
+        // Send the result back
+        res.status(200).json(user);
     } catch (error) {
         next(error);
     }

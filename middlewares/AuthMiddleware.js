@@ -6,6 +6,7 @@ const { ApiError, HttpStatus } = require('../utils/api/apiError');
 const { User } = require('../models');
 const { getConfig } = require('../utils/helpers/config');
 const redis = require('../utils/cache/redisClient');
+const logger = require('../utils/logging/logger');
 
 // Middleware to require authentication with JWT
 const requireAuth = async (req, res, next) => {
@@ -13,11 +14,7 @@ const requireAuth = async (req, res, next) => {
     if (!token) {
         return next(new ApiError(HttpStatus.UNAUTHORIZED, 'Authorization token is required'));
     }
-
     try {
-        // Rate limiting for authentication requests
-        await rateLimiter.check(req.ip);
-
         // Verify the JWT token
         const decoded = jwt.verify(token, getConfig('JWT_SECRET'));
 
@@ -39,7 +36,7 @@ const requireAuth = async (req, res, next) => {
         }
         // Attach the user details to the request object
         req.user = {
-            id: user._id,
+            _id: user._id,
             role: user.role,
             email: user.email,
             username: user.username,
@@ -60,14 +57,39 @@ const requireAuth = async (req, res, next) => {
 };
 
 // Middleware to require specific roles (Role-Based Access Control)
-const requireRole = (roles) => {
+// Role hierarchy for RBAC
+const roleHierarchy = {
+    user: 1,       // Base role
+    moderator: 2,  // Moderator role inherits user permissions
+    admin: 3,      // Admin role inherits moderator and user permissions
+};
+
+/**
+ * Middleware to require specific roles (with role hierarchy).
+ * @param {Array<string>} allowedRoles - Array of allowed roles (e.g., ['user', 'admin']).
+ */
+const requireRole = (allowedRoles) => {
     return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
+        const userRole = req.user.role;
+        
+        // If user's role is not in the hierarchy, deny access
+        if (!roleHierarchy[userRole]) {
+            return next(new ApiError(HttpStatus.FORBIDDEN, 'Unknown user role'));
+        }
+
+        // Check if the user's role is equal or higher in the hierarchy
+        const hasPermission = allowedRoles.some(
+            (role) => roleHierarchy[userRole] >= roleHierarchy[role]
+        );
+
+        if (!hasPermission) {
             return next(new ApiError(HttpStatus.FORBIDDEN, 'You do not have permission to access this resource'));
         }
+
         next();
     };
 };
+
 
 // Security measure: Ensure no unauthorized user details are injected
 // Only allows the authenticated user and role information provided by the verified JWT token

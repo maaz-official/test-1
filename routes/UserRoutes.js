@@ -7,8 +7,8 @@ const router = express.Router();
 const { requireAuth, requireRole } = require('../middlewares/AuthMiddleware');
 const { UserController } = require('../controllers');
 
-// Protect routes with the middleware
-router.get('/:userId', requireAuth, UserController.getUserProfile);
+// Protect routes with the middleware RBC details
+router.get('/:userId', requireAuth, UserController.getUserById);
 
 // Secure route for updating the profile (allow specific roles)
 router.put('/:userId', requireAuth, requireRole(['admin', 'user']), UserController.updateUserProfile);
@@ -35,7 +35,7 @@ router.post('/:userId/enable-2fa', requireAuth, requireRole(['user']), UserContr
 router.post('/:userId/disable-2fa', requireAuth, requireRole(['user']), UserController.disableTwoFactorAuth);
 
 // Route for admin to list all users
-router.get('/', requireAuth, UserController.listAllUsers);
+router.get('/', requireAuth, requireRole(['user']), UserController.listAllUsers);
 
 module.exports = router;
 
