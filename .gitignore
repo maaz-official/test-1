@@ -14,3 +14,13 @@ node_modules/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# ESLint cache
+.eslintcache
+
+# Prettier config
+.prettierrc
+.prettierignore
+
+# Husky
+.husky/_

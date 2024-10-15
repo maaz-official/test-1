@@ -168,5 +168,30 @@ userSchema.methods.resetLoginAttempts = async function () {
   await this.save();
 };
 
+userSchema.methods.getStatusMessage = function () {
+  switch (this.status) {
+    case 'active':
+      return 'Your account is active and in good standing.';
+    case 'banned':
+      return 'Your account has been banned. Please contact support.';
+    case 'suspended':
+      return 'Your account has been suspended. Please contact support for more information.';
+    case 'pending':
+      return 'Your account is pending approval. Please check your email for verification instructions.';
+    case 'locked':
+      return 'Your account is locked due to multiple failed login attempts. Please reset your password or try again later.';
+    default:
+      return 'Unknown account status.';
+  }
+};
+
+// Method to check if the phone number is verified
+userSchema.methods.isPhoneVerified = function () {
+  if (!this.phone_number || !this.phone_verified) {
+    return 'Your phone number is not verified. Please verify it to access all features.';
+  }
+  return 'Your phone number is verified.';
+};
+
 const User = mongoose.model('User', userSchema);
 module.exports = User;
