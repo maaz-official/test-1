@@ -3,6 +3,7 @@ const { ApiError } = require('../utils/api/apiError');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const logger = require('../utils/logging/logger');  
+const redis = require('../utils/cache/redisClient');
 
 // Utility to generate a secure reset token
 const generateResetToken = () => {
@@ -19,6 +20,8 @@ const generateResetToken = () => {
  * @returns {Promise<Object>} - User and profile with selected fields.
  */
 exports.getUserById = async (currentUser, userId) => {
+
+    
     // Check if the requesting user is fetching their own profile
     const isSelfRequest = currentUser._id.toString() === userId;
 
@@ -48,57 +51,71 @@ exports.getUserById = async (currentUser, userId) => {
     return user;
 };
 
+exports.updateUserProfile = async (currentUser, userId, updateData) => {
+    // Check if the current user is trying to update their own profile, or if they are an admin
+    const isSelfRequest = currentUser._id.toString() === userId;
+    const isAdmin = currentUser.role === 'admin';
 
-
-// Update user profile by ID
-exports.updateUserProfile = async (userId, updateData, currentUser) => {
-    if (currentUser.id !== userId && currentUser.role !== 'admin') {
+    if (!isSelfRequest && !isAdmin) {
         throw new ApiError(403, 'You are not authorized to update this profile');
     }
 
-    const updatedProfile = await UserProfile.findOneAndUpdate(
-        { user_id: userId },
-        { $set: updateData },
-        { new: true }
-    );
+    // Define fields that regular users can update (non-sensitive fields)
+    const userEditableFields = ['phone_number', 'email'];
+    const profileEditableFields = ['first_name', 'last_name', 'bio', 'experience_level', 'social_links', 'language_preference', 'privacy_settings'];
 
-    if (!updatedProfile) {
-        throw new ApiError(404, 'User profile not found');
-    }
+    // Admins can update any field except `username` (added rule for no username update)
+    const allowedUserFields = isAdmin ? Object.keys(User.schema.paths).filter(field => field !== 'username') : userEditableFields;
+    const allowedProfileFields = isAdmin ? Object.keys(UserProfile.schema.paths) : profileEditableFields;
 
-    logger.info(`Profile for user ${userId} updated by ${currentUser.id}`);
-    return updatedProfile;
-};
+    // Filter the updateData for the fields the user is allowed to update
+    const userUpdateData = {};
+    const profileUpdateData = {};
 
-// Update user preferences
-exports.updateUserPreferences = async (userId, preferencesData) => {
-    const allowedPreferences = ['language_preference', 'privacy_settings'];
-    const updateFields = {};
-
-    // Filter valid preferences
-    Object.keys(preferencesData).forEach(key => {
-        if (allowedPreferences.includes(key)) {
-            updateFields[key] = preferencesData[key];
+    Object.keys(updateData).forEach((field) => {
+        if (allowedUserFields.includes(field)) {
+            userUpdateData[field] = updateData[field];
+        }
+        if (allowedProfileFields.includes(field)) {
+            profileUpdateData[field] = updateData[field];
         }
     });
 
-    if (Object.keys(updateFields).length === 0) {
-        throw new ApiError(400, 'Invalid preferences fields');
+    // Check if phone number or email is being updated, and apply additional logic
+    let userNeedsUpdate = false;
+    if (userUpdateData.phone_number) {
+        userUpdateData.status = 'pending'; // Set status to pending if phone is updated
+        userNeedsUpdate = true;
+    }
+    if (userUpdateData.email) {
+        userUpdateData.email_verified = false; // Invalidate email verification if email is updated
+        userNeedsUpdate = true;
     }
 
-    const updatedPreferences = await UserProfile.findOneAndUpdate(
-        { user_id: userId },
-        { $set: updateFields },
-        { new: true }
-    );
+    // Update user and profile in parallel
+    const [updatedUser, updatedProfile] = await Promise.all([
+        userNeedsUpdate
+            ? User.findByIdAndUpdate(userId, { $set: userUpdateData }, { new: true })
+            : User.findById(userId).select('-password_hash -reset_password_token -reset_password_expires -two_factor_secret -login_attempts -lock_until'), // If no user fields need update, just fetch the user,
+        UserProfile.findOneAndUpdate(
+            { user_id: userId },
+            { $set: profileUpdateData },
+            { new: true }
+        ),
+    ]);
 
-    if (!updatedPreferences) {
-        throw new ApiError(404, 'User profile not found');
+    if (!updatedUser || !updatedProfile) {
+        throw new ApiError(404, 'User or User profile not found');
     }
 
-    logger.info(`Preferences for user ${userId} updated`);
-    return updatedPreferences;
+    // Manually populate profile in the user object (avoiding extra DB calls)
+    updatedUser.profile = updatedProfile;
+
+    // logger.info(`User profile for ${userId} updated by ${currentUser._id}`);
+    await redis.del(`user:${userId}`);
+    return updatedUser;
 };
+
 
 // Deactivate user account
 exports.deactivateUserAccount = async (userId, currentUser) => {
