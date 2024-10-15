@@ -11,10 +11,7 @@ const { UserController } = require('../controllers');
 router.get('/:userId', requireAuth, UserController.getUserById);
 
 // Secure route for updating the profile (allow specific roles)
-router.put('/:userId', requireAuth, requireRole(['admin', 'user']), UserController.updateUserProfile);
-
-// Route to update preferences (user only)
-router.put('/:userId/preferences', requireAuth, requireRole(['user']), UserController.updateUserPreferences);
+router.put('/:userId', requireAuth, requireRole(['admin', 'moderator', 'user']), UserController.updateUserProfile);
 
 // Route to deactivate user account (user only)
 router.post('/:userId/deactivate', requireAuth, requireRole(['user']), UserController.deactivateUserAccount);

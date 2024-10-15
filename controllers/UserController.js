@@ -33,23 +33,13 @@ exports.getUserById = async (req, res, next) => {
 exports.updateUserProfile = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const updatedProfile = await UserService.updateUserProfile(userId, req.body, req.user);
-        res.status(200).json(updatedProfile);
+        const updatedUser = await UserService.updateUserProfile( req.user, userId, req.body);
+        res.status(200).json(updatedUser);
     } catch (error) {
         next(error);
     }
 };
 
-// Update user preferences
-exports.updateUserPreferences = async (req, res, next) => {
-    try {
-        const { userId } = req.params;
-        const updatedPreferences = await UserService.updateUserPreferences(userId, req.body);
-        res.status(200).json(updatedPreferences);
-    } catch (error) {
-        next(error);
-    }
-};
 
 // Deactivate user account
 exports.deactivateUserAccount = async (req, res, next) => {
