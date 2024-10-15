@@ -14,6 +14,7 @@ const { getConfig } = require('./utils/helpers/config.js');
 const errorMiddleware = require('./middlewares/ErrorMiddleware.js');
 const routes = require('./routes/index.js'); 
 const { connectDB, gracefulDBShutdown} = require('./config/db.js'); 
+const { secureAttachUserDetails } = require('./middlewares/AuthMiddleware.js');
 dotenv.config();
 
 // Initialize express app
@@ -24,6 +25,7 @@ app.use(cors()); // Enable CORS
 app.use(helmet()); // Add Helmet for HTTP security headers
 app.use(compression()); // Add compression to improve response times
 app.use(cookieParser());
+app.use(secureAttachUserDetails);
 
 // Limit repeated requests to public APIs
 const limiter = rateLimit({
@@ -49,7 +51,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 connectDB();
 
 // Route Middlewares (modularized)
-// app.use('/users', routes.userRoutes);
+app.use('/users', routes.userRoutes);
 app.use('/auth', routes.authRoutes);
 // app.use('/events', routes.eventRoutes);
 // app.use('/players', routes.playerRoutes);

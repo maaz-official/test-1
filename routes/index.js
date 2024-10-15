@@ -3,7 +3,7 @@
 // This file aggregates and exports all route files for easy inclusion in the main app
 
 const authRoutes = require('./AuthRoutes');
-// const userRoutes = require('./UserRoutes');
+const userRoutes = require('./UserRoutes');
 // const eventRoutes = require('./EventRoutes');
 // const playerRoutes = require('./PlayerRoutes');
 // const hostRoutes = require('./HostRoutes');
@@ -18,7 +18,7 @@ const authRoutes = require('./AuthRoutes');
 // Export all routes
 module.exports = {
     authRoutes,
-    // userRoutes,
+    userRoutes,
     // eventRoutes,
     // playerRoutes,
     // hostRoutes,
