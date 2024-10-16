@@ -7,8 +7,8 @@ const validator = require('validator');
 const RESET_PASSWORD_EXPIRATION = 60 * 60 * 1000; // 1 hour for reset token expiration
 const LOCK_TIME = 2 * 60 * 60 * 1000; // 2 hours lock for failed login attempts
 const MAX_LOGIN_ATTEMPTS = 5; // Max login attempts before locking
+const USER_ROLES = ['user', 'admin', 'moderator'];
 
-// Schema Definition
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'moderator'],
+    enum: USER_ROLES,
     default: 'user',
     index: true,
   },

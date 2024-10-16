@@ -41,7 +41,9 @@ exports.updateUserProfile = async (req, res, next) => {
 };
 
 
-// Deactivate user account
+/**
+ * Deactivate the current user's account.
+ */
 exports.deactivateUserAccount = async (req, res, next) => {
     try {
         const { userId } = req.params;
@@ -52,18 +54,22 @@ exports.deactivateUserAccount = async (req, res, next) => {
     }
 };
 
-// Delete user account (admin only)
+/**
+ * Delete a user account (admin only).
+ */
 exports.deleteUserAccount = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        await UserService.deleteUserAccount(userId);
+        await UserService.deleteUserAccount(userId, req.user);
         res.status(200).json({ message: 'User account deleted successfully' });
     } catch (error) {
         next(error);
     }
 };
 
-// Initiate password reset
+/**
+ * Initiate password reset for a given email.
+ */
 exports.initiatePasswordReset = async (req, res, next) => {
     try {
         const { email } = req.body;
@@ -74,7 +80,9 @@ exports.initiatePasswordReset = async (req, res, next) => {
     }
 };
 
-// Complete password reset
+/**
+ * Complete password reset with token and new password.
+ */
 exports.completePasswordReset = async (req, res, next) => {
     try {
         const { token, newPassword } = req.body;
@@ -85,11 +93,13 @@ exports.completePasswordReset = async (req, res, next) => {
     }
 };
 
-// Enable Two-Factor Authentication
+/**
+ * Enable Two-Factor Authentication.
+ */
 exports.enableTwoFactorAuth = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const { method } = req.body; // e.g., 'sms' or 'authenticator'
+        const { method } = req.body;
         const result = await UserService.enableTwoFactorAuth(userId, method);
         res.status(200).json({ message: 'Two-factor authentication enabled', data: result });
     } catch (error) {
@@ -97,7 +107,9 @@ exports.enableTwoFactorAuth = async (req, res, next) => {
     }
 };
 
-// Disable Two-Factor Authentication
+/**
+ * Disable Two-Factor Authentication.
+ */
 exports.disableTwoFactorAuth = async (req, res, next) => {
     try {
         const { userId } = req.params;
