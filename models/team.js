@@ -33,6 +33,11 @@ const teamSchema = new mongoose.Schema({
       message: 'Minimum members cannot exceed maximum members',
     },
   },
+  team_type: {
+    type: String,
+    enum: ['competitive', 'casual'],
+    default: 'casual',
+  },
   created_at: {
     type: Date,
     default: Date.now,
