@@ -117,9 +117,12 @@ exports.updateUserProfile = async (currentUser, userId, updateData) => {
 };
 
 
-// Deactivate user account
+/**
+ * Deactivate user account. Only the owner of the account can deactivate it.
+ * Clears the cache after deactivation.
+ */
 exports.deactivateUserAccount = async (userId, currentUser) => {
-    if (currentUser.id !== userId) {
+    if (currentUser._id.toString() !== userId) {
         throw new ApiError(403, 'You can only deactivate your own account');
     }
 
@@ -138,6 +141,8 @@ exports.deactivateUserAccount = async (userId, currentUser) => {
         await session.commitTransaction();
         session.endSession();
 
+        await redisClient.del(`user:${userId}`);
+
         logger.info(`User ${userId} deactivated`);
         return user;
     } catch (error) {
@@ -147,7 +152,10 @@ exports.deactivateUserAccount = async (userId, currentUser) => {
     }
 };
 
-// Delete user account (admin only)
+/**
+ * Delete a user and profile. Only admins can delete accounts.
+ * Deletes related data and clears the cache after deletion.
+ */
 exports.deleteUserAccount = async (userId, currentUser) => {
     if (currentUser.role !== 'admin') {
         throw new ApiError(403, 'Only admins can delete user accounts');
@@ -162,9 +170,15 @@ exports.deleteUserAccount = async (userId, currentUser) => {
             throw new ApiError(404, 'User not found');
         }
 
-        await User.deleteOne({ _id: userId }).session(session);
+        await Promise.all([
+            User.deleteOne({ _id: userId }).session(session),
+            UserProfile.deleteOne({ user_id: userId }).session(session),
+        ]);
+
         await session.commitTransaction();
         session.endSession();
+
+        await redisClient.del(`user:${userId}`);
 
         logger.info(`User ${userId} deleted by admin ${currentUser.id}`);
     } catch (error) {
@@ -174,7 +188,9 @@ exports.deleteUserAccount = async (userId, currentUser) => {
     }
 };
 
-// Initiate password reset (generates token and sends email)
+/**
+ * Initiate password reset by generating a token and sending it via email.
+ */
 exports.initiatePasswordReset = async (email) => {
     const user = await User.findOne({ email });
     if (!user) {
@@ -187,18 +203,20 @@ exports.initiatePasswordReset = async (email) => {
 
     await user.save();
 
-    // Send reset token to user's email (implement email sending logic)
-    // await sendResetEmail(user.email, resetToken);
-
+    // Implement logic to send reset token via email (out of scope)
     logger.info(`Password reset token generated for ${email}`);
+
+    return { resetToken };
 };
 
-// Complete password reset
+/**
+ * Complete password reset using the token and a new password.
+ */
 exports.completePasswordReset = async (token, newPassword) => {
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({
         reset_password_token: hashedToken,
-        reset_password_expires: { $gt: Date.now() }
+        reset_password_expires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -213,7 +231,9 @@ exports.completePasswordReset = async (token, newPassword) => {
     logger.info(`Password reset successful for user ${user.email}`);
 };
 
-// Enable 2FA
+/**
+ * Enable Two-Factor Authentication (2FA) for a user.
+ */
 exports.enableTwoFactorAuth = async (userId, method) => {
     const validMethods = ['sms', 'authenticator'];
     if (!validMethods.includes(method)) {
@@ -233,7 +253,9 @@ exports.enableTwoFactorAuth = async (userId, method) => {
     return { twoFactorEnabled: true, method };
 };
 
-// Disable 2FA
+/**
+ * Disable Two-Factor Authentication (2FA) for a user.
+ */
 exports.disableTwoFactorAuth = async (userId) => {
     const user = await User.findById(userId);
     if (!user) {
@@ -246,6 +268,7 @@ exports.disableTwoFactorAuth = async (userId) => {
 
     logger.info(`2FA disabled for user ${userId}`);
 };
+
 
 // List all users 
 exports.listAllUsers = async () => {
