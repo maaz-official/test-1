@@ -4,7 +4,7 @@
 
 const authRoutes = require('./AuthRoutes');
 const userRoutes = require('./UserRoutes');
-// const eventRoutes = require('./EventRoutes');
+const eventRoutes = require('./EventRoutes');
 // const playerRoutes = require('./PlayerRoutes');
 // const hostRoutes = require('./HostRoutes');
 // const mapRoutes = require('./MapRoutes');
@@ -19,7 +19,7 @@ const userRoutes = require('./UserRoutes');
 module.exports = {
     authRoutes,
     userRoutes,
-    // eventRoutes,
+    eventRoutes,
     // playerRoutes,
     // hostRoutes,
     // mapRoutes,

@@ -53,7 +53,7 @@ connectDB();
 // Route Middlewares (modularized)
 app.use('/users', routes.userRoutes);
 app.use('/auth', routes.authRoutes);
-// app.use('/events', routes.eventRoutes);
+app.use('/events', routes.eventRoutes);
 // app.use('/players', routes.playerRoutes);
 // app.use('/hosts', routes.hostRoutes);
 // app.use('/map', routes.mapRoutes);
