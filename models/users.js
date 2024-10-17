@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const argon2 = require('argon2');
 const crypto = require('crypto');
 const validator = require('validator');
+const handleProfanity = require('../utils/profanity/profanityFilter');
 
 // Constants
 const RESET_PASSWORD_EXPIRATION = 60 * 60 * 1000; // 1 hour for reset token expiration
@@ -17,6 +18,13 @@ const userSchema = new mongoose.Schema({
     trim: true,
     match: [/^[a-zA-Z0-9._-]{3,30}$/, 'Invalid username format'],
     index: true,
+    validate: {
+      validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false);
+        return !containsProfanity; 
+      },
+      message: 'Username contains inappropriate content.',
+    },
   },
   email: {
     type: String,
