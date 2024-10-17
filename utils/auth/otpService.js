@@ -1,15 +1,23 @@
 const crypto = require('crypto');
 const redis = require('../cache/redisClient');
-const { Vonage } = require('@vonage/server-sdk');
+const twilio = require('twilio');
 const logger = require('../logging/logger'); 
 const { getConfig } = require('../helpers/config');
 const { ApiError, HttpStatus } = require('../api/apiError');
+const { default: axios } = require('axios');
+const https = require('https');
 
-// Initialize Vonage client with your API key and secret
-const vonage = new Vonage({
-    apiKey: getConfig('VONAGE_API_KEY'),
-    apiSecret: getConfig('VONAGE_API_SECRET'),
-});
+// Initialize Twilio client with your Account SID and Auth Token
+// const accountSid = getConfig('TWILIO_ACCOUNT_SID');
+// const authToken = getConfig('TWILIO_AUTH_TOKEN');
+// const TWILIO_PHONE_NUMBER = getConfig('TWILIO_PHONE_NUMBER');
+
+// // Create a new Twilio client
+// const twilioClient = twilio(accountSid, authToken);
+
+const TRACCAR_SMS_API_URL = getConfig('TRACCAR_SMS_API_URL');
+const TRACCAR_SMS_API_KEY = getConfig('TRACCAR_SMS_API_KEY'); 
+
 
 // OTP configuration from environment variables
 const OTP_LENGTH = getConfig('OTP_LENGTH', 6);
@@ -17,14 +25,26 @@ const OTP_EXPIRATION = getConfig('OTP_EXPIRATION', 300); // 5 minutes in seconds
 const OTP_RESEND_INTERVAL = getConfig('OTP_RESEND_INTERVAL', 60); // 1 minute in seconds
 const OTP_RATE_LIMIT = getConfig('OTP_RATE_LIMIT', 5); // Max OTP requests per 5 minutes
 
+
+// Helper function to ensure key is 32 bytes (256 bits)
+const getEncryptionKey = () => {
+    const key = getConfig('ENCRYPTION_KEY');
+    if (key.length === 32) {
+        return Buffer.from(key); // Already 32 bytes
+    } else {
+        // Hash the key to ensure it's 32 bytes
+        return crypto.createHash('sha256').update(key).digest();
+    }
+};
 /**
  * Encrypts the OTP using AES-256-CBC.
  * @param {string} otp - The OTP to encrypt.
  * @returns {string} - The encrypted OTP.
  */
 const encryptOtp = (otp) => {
-    const iv = crypto.randomBytes(16); // Initialization vector
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(getConfig('ENCRYPTION_KEY')), iv);
+    const iv = crypto.randomBytes(16);
+    const key = getEncryptionKey();
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(otp);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
     return `${iv.toString('hex')}:${encrypted.toString('hex')}`;
@@ -38,7 +58,8 @@ const encryptOtp = (otp) => {
 const decryptOtp = (encryptedOtp) => {
     const [ivHex, encryptedText] = encryptedOtp.split(':');
     const iv = Buffer.from(ivHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(getConfig('ENCRYPTION_KEY')), iv);
+    const key = getEncryptionKey();
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(Buffer.from(encryptedText, 'hex'));
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
@@ -53,19 +74,46 @@ const generateOtp = (length = OTP_LENGTH) => {
     return crypto.randomInt(Math.pow(10, length - 1), Math.pow(10, length)).toString();
 };
 
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false 
+});
+
 /**
- * Send OTP to the provided phone number using Vonage.
+ * Send OTP to the provided phone number using Twilio.
  * @param {string} phone - The phone number to send OTP to.
  * @param {string} otp - The OTP code to send.
  */
 const sendOtp = async (phone, otp) => {
     try {
-        // Send the OTP via Vonage SMS
-        await vonage.sms.send({
-            to: phone,
-            from: getConfig('VONAGE_FROM_NUMBER'),
-            text: `Your verification code is ${otp}`,
+
+        // Send the OTP via Twilio SMS
+        // await twilioClient.messages.create({
+        //     to: phone,
+        //     from: TWILIO_PHONE_NUMBER,
+        //     body: `Your verification code is ${otp}`,
+        // });
+        
+        // Send the OTP via Traccar SMS Gateway API
+        let data = JSON.stringify({
+            "to": phone,
+            "message": `Your OTP code is ${otp}`
         });
+
+        let config = {
+            method: 'post',
+            maxBodyLength: Infinity,
+            url: TRACCAR_SMS_API_URL,
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': TRACCAR_SMS_API_KEY
+            },
+            data : data
+        };
+
+        // Send the OTP via Traccar SMS Gateway API
+        const response = await axios.request(config);
+        logger.info(`OTP sent successfully: ${response.data}`);
+        
         
         const encryptedOtp = encryptOtp(otp);
         await redis.setex(`otp:${phone}`, OTP_EXPIRATION, encryptedOtp);

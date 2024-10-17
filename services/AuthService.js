@@ -36,7 +36,7 @@ exports.createAccount = async ({ phone }) => {
     );
 
     // Send OTP via SMS (ensure the sendOtp function is implemented properly)
-    // await sendOtp(phone, otp);
+    await sendOtp(phone, otp);
 
     // Generate JWT token to resume the account creation flow
     const accountCreationToken = generateAccountCreationToken(phone);
