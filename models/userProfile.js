@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
+const handleProfanity = require('../utils/profanity/profanityFilter');
+// const profanityUtil = require('profanity-util');
 
 const userProfileSchema = new mongoose.Schema({
   user_id: {
@@ -14,14 +16,28 @@ const userProfileSchema = new mongoose.Schema({
     required: true,
     trim: true,
     minlength: 2,
-    maxlength: 50
+    maxlength: 50,
+    validate: {
+    validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false);
+        return !containsProfanity; 
+      },
+      message: 'First name contains inappropriate content.',
+    },
   },
   last_name: {
     type: String,
     required: true,
     trim: true,
     minlength: 2,
-    maxlength: 50
+    maxlength: 50,
+    validate: {
+    validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false);
+        return !containsProfanity; 
+      },
+      message: 'Last  name contains inappropriate content.',
+    },
   },
   profile_picture_url: {
     type: String,
@@ -33,7 +49,14 @@ const userProfileSchema = new mongoose.Schema({
   bio: {
     type: String,
     trim: true,
-    maxlength: 500
+    maxlength: 500,
+    validate: {
+    validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false);
+        return !containsProfanity; 
+      },
+      message: 'bio name contains inappropriate content.',
+    },
   },
   experience_level: {
     type: String,

@@ -1,7 +1,12 @@
 ﻿const { Event, User, Participation } = require('../models');
-const { ApiError } = require('../utils/api/apiError');
+const { ApiError, HttpStatus } = require('../utils/api/apiError');
+const sanitizeHtml = require('sanitize-html');
 const redis = require('../utils/cache/redisClient');
 const logger = require('../utils/logging/logger');
+const handleProfanity = require('../utils/profanity/profanityFilter');
+// const profanityUtil = require('profanity-util');
+
+
 
 /**
  * Cache helper function to interact with Redis
@@ -25,6 +30,19 @@ const cache = {
  * @param {String} hostId - ID of the user creating the event.
  */
 exports.createEvent = async (eventData, hostId) => {
+
+  eventData.title = sanitizeHtml(eventData.title);
+  eventData.description = sanitizeHtml(eventData.description);
+
+  if (handleProfanity(eventData.title)) {
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'Title contains inappropriate content.');
+  }
+
+  if (handleProfanity(eventData.description)) {
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'Description contains inappropriate content.');
+  }
+
+
     const event = new Event({
         ...eventData,
         host_user_id: hostId,
@@ -111,23 +129,58 @@ exports.getAllEvents = async () => {
 /**
  * Search for events based on query parameters (with Redis caching).
  */
-exports.searchEvents = async (query) => {
-    const searchCriteria = {};
-    if (query.sport) searchCriteria.sport_id = query.sport;
-    if (query.date) searchCriteria.date_time = { $gte: query.date };
+exports.searchEvents = async (req) => {
+    const { latitude, longitude, radius, sportId, isUpcoming, isPopular, date } = req.query;
 
-    const cacheKey = `events:search:${JSON.stringify(searchCriteria)}`;
-    let events = await cache.get(cacheKey);
+    const searchCriteria = {}; // Initialize an empty search criteria object
+    const today = new Date();
 
+    // If sportId is provided, add sport filter
+    if (sportId) searchCriteria.sport_id = sportId;
+
+    // If date is provided, filter events after the provided date, or filter by upcoming events
+    if (date) {
+        searchCriteria.date_time = { $gte: new Date(date) };
+    } else if (isUpcoming === 'true') {
+        searchCriteria.date_time = { $gte: today }; // Only future events
+    }
+
+    // Geolocation filter if latitude, longitude, and radius are provided
+    if (latitude && longitude && radius) {
+        searchCriteria.coordinates = {
+            $geoWithin: {
+                $centerSphere: [[longitude, latitude], radius / 6378.1], // Convert radius to kilometers
+            },
+        };
+    }
+
+    // If popular events are requested, sort them by participants count
+    let sort = {};
+    if (isPopular === 'true') {
+        sort = { participants_count: -1 }; // Sort by most participants or views
+    }
+
+    // Create a cache key based on the search criteria to uniquely cache this query
+    const cacheKey = `events:search:${JSON.stringify(searchCriteria)}:${JSON.stringify(sort)}`;
+    
+    // Check if cached results exist
+    let events = await redis.get(cacheKey);
+    
     if (!events) {
+        // Query the database with the search criteria and sorting
         events = await Event.find(searchCriteria)
+            .sort(sort) // Apply sorting if specified
             .populate('host_user_id', 'first_name last_name');
-        await cache.set(cacheKey, events, 3600); // Cache for 1 hour
+        
+        // Cache the result for 1 hour (3600 seconds)
+        await redis.set(cacheKey, JSON.stringify(events), 'EX', 3600);
+    } else {
+        // Parse the cached string back into a JavaScript object
+        events = JSON.parse(events);
     }
 
     return events;
 };
-
 /**
  * Get upcoming events happening today or in the future (with Redis caching).
  */

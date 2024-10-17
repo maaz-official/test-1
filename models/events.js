@@ -1,8 +1,24 @@
 const mongoose = require('mongoose');
+const sanitizeHtml = require('sanitize-html'); 
+const handleProfanity = require('../utils/profanity/profanityFilter');
+
 // Event Schema
 const eventSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true, trim: true },
+      title: {
+        type: String,
+        required: true,
+        trim: true,
+        minlength: 3, 
+        maxlength: 100,
+        validate: {
+          validator: function (v) {
+            const { containsProfanity } = handleProfanity(v, false);
+            return !containsProfanity; 
+          },
+          message: 'Title contains inappropriate content.',
+        },
+      },
     sport_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Sport',
@@ -15,7 +31,19 @@ const eventSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    description: { type: String, trim: true },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 500, // Max length for description
+      validate: {
+        validator: function (v) {
+          const { containsProfanity } = handleProfanity(v, false);
+          return !containsProfanity; 
+        },
+        message: 'Description contains inappropriate content.',
+      },
+      set: v => sanitizeHtml(v, { allowedTags: [], allowedAttributes: {} }),
+    },
     location_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Location',
@@ -114,6 +142,8 @@ eventSchema.pre('save', function (next) {
   if (!this.isModified('updated_at')) {
     this.updated_at = Date.now();
   }
+  this.title = sanitizeHtml(this.title, { allowedTags: [], allowedAttributes: {} });
+  this.description = sanitizeHtml(this.description, { allowedTags: [], allowedAttributes: {} });
   next();
 });
 

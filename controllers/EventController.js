@@ -69,7 +69,7 @@ exports.getAllEvents = async (req, res, next) => {
  */
 exports.searchEvents = async (req, res, next) => {
     try {
-        const events = await EventService.searchEvents(req.query);
+        const events = await EventService.searchEvents(req);
         res.status(200).json(events);
     } catch (error) {
         next(error);

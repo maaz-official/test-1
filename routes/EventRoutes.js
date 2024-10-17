@@ -18,10 +18,12 @@ router.put('/:eventId', requireAuth, EventController.updateEvent);
 // Route to cancel an event
 router.put('/:eventId/cancel', requireAuth, EventController.cancelEvent);
 
+
+
 // Route to get a list of all events (for admin or general event discovery)
 router.get('/', EventController.getAllEvents);
 
-// Route to filter events by location, type, or time
+// Route to filter events by location, type, time, popularity, and sport
 router.get('/search', EventController.searchEvents);
 
 // Route to get events happening today or upcoming
@@ -36,6 +38,11 @@ router.get('/sport/:sportId', EventController.getEventsBySport);
 // Route to get events by a geolocation radius (using longitude, latitude)
 router.get('/nearby', EventController.getEventsNearLocation);
 
+// Route to get popular events based on participation or views
+router.get('/popular', EventController.getPopularEvents);
+
+
+
 // Route to get a list of events a user has participated in
 router.get('/user/:userId/participated', requireAuth, EventController.getUserParticipationHistory);
 
@@ -45,8 +52,6 @@ router.put('/:eventId/status', requireAuth, requireRole(['host', 'admin']), Even
 // Route for host to update real-time status (e.g., check-in, mark as live)
 router.put('/:eventId/live', requireAuth, requireRole(['host']), EventController.updateEventLiveStatus);
 
-// Route to get popular events based on participation or views
-router.get('/popular', EventController.getPopularEvents);
 
 // Route to invite users to join an event
 router.post('/:eventId/invite', requireAuth, EventController.inviteUsersToEvent);
