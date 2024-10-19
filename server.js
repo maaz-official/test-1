@@ -20,26 +20,28 @@ dotenv.config();
 // Initialize express app
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:8081',
-  'http://localhost:3000',
-  'https://your-frontend-domain.com',
-  'https://another-allowed-domain.com',
-];
+// const allowedOrigins = [
+//   'http://localhost:8081',
+//   'http://localhost:3000',
+//   'https://your-frontend-domain.com',
+//   'https://another-allowed-domain.com',
+// ];
 
+// const corsOptions = {
+//   origin: (origin, callback) => {
+//       // Allow requests with no origin (like mobile apps or curl requests)
+//       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+//           callback(null, true);
+//       } else {
+//           callback(new Error('Not allowed by CORS'));
+//       }
+//   },
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+// };
 const corsOptions = {
-  origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-          callback(null, true);
-      } else {
-          callback(new Error('Not allowed by CORS'));
-      }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: '*',
 };
-
 app.use(cors(corsOptions));
 
 // Security Middlewares
