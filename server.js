@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const bodyParser = require('body-parser');
@@ -17,34 +16,14 @@ const { connectDB, gracefulDBShutdown} = require('./config/db.js');
 const { secureAttachUserDetails } = require('./middlewares/AuthMiddleware.js');
 dotenv.config();
 
-// Initialize express app
 const app = express();
 
-// const allowedOrigins = [
-//   'http://localhost:8081',
-//   'http://localhost:3000',
-//   'https://your-frontend-domain.com',
-//   'https://another-allowed-domain.com',
-// ];
-
-// const corsOptions = {
-//   origin: (origin, callback) => {
-//       // Allow requests with no origin (like mobile apps or curl requests)
-//       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-//           callback(null, true);
-//       } else {
-//           callback(new Error('Not allowed by CORS'));
-//       }
-//   },
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-// };
-// const corsOptions = {
-//   origin: '*',
-// };
-
+app.use(cors({
+  origin: '*', 
+  credentials: true, 
+})); 
 // Security Middlewares
-// app.use(cors(corsOptions)); // Enable CORS
+app.use(cors()); // Enable CORS
 app.use(helmet()); // Add Helmet for HTTP security headers
 app.use(compression()); // Add compression to improve response times
 app.use(cookieParser());
