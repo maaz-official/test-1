@@ -13,7 +13,7 @@ const eventRoutes = require('./EventRoutes');
 // const leaderboardRoutes = require('./LeaderboardRoutes');
 // const analyticsRoutes = require('./AnalyticsRoutes');
 // const fileUploadRoutes = require('./FileUploadRoutes');
-// const adminRoutes = require('./AdminRoutes');
+const adminRoutes = require('./AdminRoutes');
 
 // Export all routes
 module.exports = {
@@ -28,6 +28,6 @@ module.exports = {
     // leaderboardRoutes,
     // analyticsRoutes,
     // fileUploadRoutes,
-    // adminRoutes
+    adminRoutes
 };
 

@@ -34,15 +34,6 @@ exports.createEvent = async (eventData, hostId) => {
   eventData.title = sanitizeHtml(eventData.title);
   eventData.description = sanitizeHtml(eventData.description);
 
-  if (handleProfanity(eventData.title)) {
-    throw new ApiError(HttpStatus.BAD_REQUEST, 'Title contains inappropriate content.');
-  }
-
-  if (handleProfanity(eventData.description)) {
-    throw new ApiError(HttpStatus.BAD_REQUEST, 'Description contains inappropriate content.');
-  }
-
-
     const event = new Event({
         ...eventData,
         host_user_id: hostId,
@@ -52,7 +43,7 @@ exports.createEvent = async (eventData, hostId) => {
     // Clear related cache (invalidate event cache and popular events)
     await cache.del(`events:host:${hostId}`);
     await cache.del('events:popular');
-
+    await cache.del(`sport_${event.sport_id}`);
     return event;
 };
 
@@ -66,13 +57,15 @@ exports.getEventDetails = async (eventId) => {
     if (!event) {
         event = await Event.findById(eventId)
             .populate('host_user_id', 'first_name last_name')
-            .populate('participants.user_id', 'first_name last_name');
+            .populate('participants.user_id', 'first_name last_name')
+            .populate('location_id') 
+            .populate('sport_id')    
+            .exec();
 
         if (!event) {
             throw new ApiError(404, 'Event not found');
         }
 
-        // Cache the result for future queries
         await cache.set(cacheKey, event);
     }
 

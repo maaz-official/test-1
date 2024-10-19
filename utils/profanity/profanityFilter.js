@@ -58,16 +58,16 @@ wordList.forEach(word => trie.insert(word));
  * @returns {Object} - Returns an object with `containsProfanity` and `processedText`.
  */
 const handleProfanity = (text, censor = false) => {
-  const words = text.split(/\b[\w']+\b/);
+  const words = text.match(/\w+('\w+)?/g) || []; 
   let containsProfanity = false;
 
   const processedText = words.map(word => {
-    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
+    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     if (trie.search(cleanWord)) {
       containsProfanity = true;
-      return censor ? '*'.repeat(word.length) : word;
+      return censor ? '*'.repeat(word.length) : word; 
     }
-    return word;
+    return word; 
   }).join(' ');
 
   return { containsProfanity, processedText };
