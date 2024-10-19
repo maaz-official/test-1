@@ -39,13 +39,12 @@ const app = express();
 //   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 //   allowedHeaders: ['Content-Type', 'Authorization'],
 // };
-const corsOptions = {
-  origin: '*',
-};
-app.use(cors(corsOptions));
+// const corsOptions = {
+//   origin: '*',
+// };
 
 // Security Middlewares
-app.use(cors(corsOptions)); // Enable CORS
+// app.use(cors(corsOptions)); // Enable CORS
 app.use(helmet()); // Add Helmet for HTTP security headers
 app.use(compression()); // Add compression to improve response times
 app.use(cookieParser());
