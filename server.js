@@ -62,7 +62,7 @@ app.use('/events', routes.eventRoutes);
 // app.use('/leaderboard', routes.leaderboardRoutes);
 // app.use('/analytics', routes.analyticsRoutes);
 // app.use('/files', routes.fileUploadRoutes);
-// app.use('/admin', routes.adminRoutes);
+app.use('/admin', routes.adminRoutes);
 
 // Root route (Welcome message)
 app.get('/', (req, res) => {

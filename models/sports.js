@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const handleProfanity = require('../utils/profanity/profanityFilter');
 const ICON_URL_REGEX = /^(http|https):\/\/[^\s]+$/;
 
 // Schema Definition
@@ -9,10 +10,24 @@ const sportSchema = new mongoose.Schema({
     required: true,
     trim: true, 
     index: true,
+    validate: {
+      validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false);
+        return !containsProfanity; 
+      },
+      message: 'Name contains inappropriate content.',
+    },
   },
   description: {
     type: String,
-    trim: true, 
+    trim: true,
+    validate: {
+      validator: function (v) {
+        const { containsProfanity } = handleProfanity(v, false)
+        return !containsProfanity;
+      },
+      message: 'Description contains inappropriate content.',
+    }, 
   },
   icon_url: {
     type: String,
