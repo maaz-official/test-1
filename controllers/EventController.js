@@ -45,8 +45,8 @@ exports.updateEvent = async (req, res, next) => {
  */
 exports.cancelEvent = async (req, res, next) => {
     try {
-        await EventService.cancelEvent(req.params.eventId);
-        res.status(200).json({ message: 'Event cancelled successfully' });
+        const message = await EventService.cancelEvent(req.params.eventId, req.user);
+        res.status(200).json({ message });
     } catch (error) {
         next(error);
     }

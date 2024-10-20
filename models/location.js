@@ -44,7 +44,7 @@ const locationSchema = new mongoose.Schema(
 // Geospatial indexing for location and geofence
 locationSchema.index({ location: '2dsphere' });
 locationSchema.index({ geofence: '2dsphere' });
-
+locationSchema.index({ latitude: 1, longitude: 1 }, { unique: true });
 // Virtuals for relationships
 locationSchema.virtual('events', { ref: 'Event', localField: '_id', foreignField: 'location_id' });
 

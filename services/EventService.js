@@ -1,4 +1,5 @@
-﻿const { Event, User, Participation } = require('../models');
+﻿const mongoose = require('mongoose');
+const { Event, User, Participation, Location } = require('../models');
 const { ApiError, HttpStatus } = require('../utils/api/apiError');
 const sanitizeHtml = require('sanitize-html');
 const redis = require('../utils/cache/redisClient');
@@ -30,77 +31,227 @@ const cache = {
  * @param {String} hostId - ID of the user creating the event.
  */
 exports.createEvent = async (eventData, hostId) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-  eventData.title = sanitizeHtml(eventData.title);
-  eventData.description = sanitizeHtml(eventData.description);
+    try {
+        eventData.title = sanitizeHtml(eventData.title);
+        eventData.description = sanitizeHtml(eventData.description);
 
-    const event = new Event({
-        ...eventData,
-        host_user_id: hostId,
-    });
-    await event.save();
+        const { latitude, longitude } = eventData.location;
+        let location = await Location.findOne({ latitude, longitude }).session(session);
 
-    // Clear related cache (invalidate event cache and popular events)
-    await cache.del(`events:host:${hostId}`);
-    await cache.del('events:popular');
-    await cache.del(`sport_${event.sport_id}`);
-    return event;
+        // Create or update the location
+        if (!location) {
+            location = new Location({
+                name: eventData.location.name,
+                latitude,
+                longitude,
+                address: eventData.location.address,
+                description: eventData.location.description,
+                accuracy: eventData.location.accuracy,
+                tags: eventData.location.tags || [],
+                status: 'active',
+                trackingEnabled: true,
+                geofence: {
+                    type: 'Point',
+                    coordinates: [longitude, latitude],
+                    radius: eventData.location.geofence.radius || 0
+                }
+            });
+            await location.save({ session });
+        }
+
+        // Create the event
+        const event = new Event({
+            ...eventData,
+            host_user_id: hostId,
+            location_id: location._id,
+        });
+        await event.save({ session });
+
+        // Commit transaction
+        await session.commitTransaction();
+
+        // Clear related cache
+        await cache.del(`events:host:${hostId}`);
+        await cache.del('events:popular');
+        await cache.del(`sport_${event.sport_id}`);
+        
+        return event;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error; // Re-throw the error for higher-level handling
+    } finally {
+        session.endSession();
+    }
 };
+
 
 /**
  * Get event details by event ID.
  */
 exports.getEventDetails = async (eventId) => {
     const cacheKey = `event:${eventId}`;
-    let event = await cache.get(cacheKey);
-
+    // let event = await cache.get(cacheKey);
+let event;
     if (!event) {
         event = await Event.findById(eventId)
-            .populate('host_user_id', 'first_name last_name')
-            .populate('participants.user_id', 'first_name last_name')
-            .populate('location_id') 
-            .populate('sport_id')    
-            .exec();
+        .populate({
+            path: 'host_user_id', // Populate host user
+            select: 'profile', // Only need to select the profile virtual
+            populate: {
+              path: 'profile', // Populate the user's profile
+              select: 'first_name last_name experience_level profile_picture_url' // Select fields from UserProfile
+            }
+          })
+        .populate({
+            path: 'participants', // Populate the participants array
+            populate: {
+            path: 'user_id', // Populate the user_id for each participant
+            select: 'profile', // Only need to select the profile virtual
+            populate: {
+                path: 'profile', // Populate the user's profile
+                select: 'first_name last_name experience_level profile_picture_url' // Select fields from UserProfile
+            }
+            }
+        })
+        .populate('location_id') // Populate location
+        .populate('sport_id') // Populate sport
+        .exec();
 
         if (!event) {
             throw new ApiError(404, 'Event not found');
         }
 
+        // Cache the event details
         await cache.set(cacheKey, event);
+    }
+
+    // Check if participants exist and handle accordingly
+    if (!event.participants || event.participants.length === 0) {
+        event.participants = []; // Ensure it's an empty array
+    } else {
+        // If participants exist, check for profiles and add default values if not found
+        event.participants = event.participants.map(participant => {
+            const { user_id } = participant;
+            const fullName = user_id ? `${user_id.first_name || 'Unknown'} ${user_id.last_name || ''}`.trim() : 'Unknown User';
+            return {
+                ...participant.toObject(), // Convert to plain object to avoid Mongoose doc methods
+                fullName,
+                profile_picture_url: user_id?.profile?.profile_picture_url || 'default_picture_url.png' // Provide a default profile picture if not available
+            };
+        });
     }
 
     return event;
 };
-
 /**
  * Update an event's details.
  */
 exports.updateEvent = async (eventId, updateData) => {
-    const updatedEvent = await Event.findByIdAndUpdate(eventId, updateData, { new: true });
-    if (!updatedEvent) {
-        throw new ApiError(404, 'Event not found');
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        // Sanitize the input
+        if (updateData.title) updateData.title = sanitizeHtml(updateData.title);
+        if (updateData.description) updateData.description = sanitizeHtml(updateData.description);
+
+        // Find the event
+        const event = await Event.findById(eventId).session(session);
+        if (!event) {
+            throw new ApiError(404, 'Event not found');
+        }
+
+        // Update location if any location details are present in updateData
+        if (updateData.location) {
+            const { latitude, longitude, name, address, description, accuracy, tags, geofence } = updateData.location;
+
+            // Find the existing location using the event's current location_id
+            let location = await Location.findById(event.location_id).session(session);
+            if (!location) {
+                // If the location doesn't exist, create a new one
+                location = new Location({
+                    name: name || '', // Default to empty string if not provided
+                    latitude: latitude || 0, // Default to 0 if not provided
+                    longitude: longitude || 0, // Default to 0 if not provided
+                    address: address || '', // Default to empty string if not provided
+                    description: description || '', // Default to empty string if not provided
+                    accuracy: accuracy || 0, // Default to 0 if not provided
+                    tags: tags || [],
+                    status: 'active',
+                    trackingEnabled: true,
+                    geofence: {
+                        type: 'Point',
+                        coordinates: [longitude || 0, latitude || 0], // Default to 0 if not provided
+                        radius: geofence?.radius || 0 // Default to 0 if radius is not provided
+                    }
+                });
+                await location.save({ session });
+                event.location_id = location._id; // Update the event to link to the new location
+            } else {
+                // Update the existing location if it exists
+                if (name) location.name = name; // Update only if provided
+                if (address) location.address = address; // Update only if provided
+                if (description) location.description = description; // Update only if provided
+                if (accuracy !== undefined) location.accuracy = accuracy; // Update only if provided
+                if (tags) location.tags = tags; // Update only if provided
+                if (latitude !== undefined && longitude !== undefined) {
+                    location.latitude = latitude; // Update latitude only if provided
+                    location.longitude = longitude; // Update longitude only if provided
+                    // Update geofence only if latitude and longitude are provided
+                    location.geofence = {
+                        type: 'Point',
+                        coordinates: [longitude, latitude],
+                        radius: geofence?.radius || location.geofence.radius // Update radius only if provided
+                    };
+                }
+                await location.save({ session }); // Save changes to the existing location
+            }
+        }
+
+        // Update other fields of the event based on the provided updateData
+        Object.keys(updateData).forEach(key => {
+            if (key !== 'location') {
+                event[key] = updateData[key]; // Update fields directly on the event
+            }
+        });
+
+        await event.save({ session }); // Save the updated event
+        await session.commitTransaction();
+        return event; // Return the updated event
+    } catch (error) {
+        await session.abortTransaction();
+        throw error; // Rethrow the error after aborting
+    } finally {
+        session.endSession(); // End the session
     }
-
-    // Invalidate cache for this event
-    await cache.del(`event:${eventId}`);
-
-    return updatedEvent;
 };
 
 /**
  * Cancel an event.
  */
-exports.cancelEvent = async (eventId) => {
+exports.cancelEvent = async (eventId, currentUser) => {
     const event = await Event.findById(eventId);
     if (!event) {
         throw new ApiError(404, 'Event not found');
     }
+
+    // Check if the user is an admin or the host of the event
+    if (currentUser.role !== 'admin' && event.host_user_id.toString() !== currentUser._id.toString()) {
+        throw new ApiError(403, 'You do not have permission to cancel this event');
+    }
+
+    // Cancel the event
     event.status = 'cancelled';
     await event.save();
 
     // Invalidate cache
     await cache.del(`event:${eventId}`);
     await cache.del(`events:host:${event.host_user_id}`);
+
+    return 'Event cancelled successfully';
 };
 
 /**
