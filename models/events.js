@@ -93,10 +93,10 @@ const eventSchema = new mongoose.Schema(
       default: 'public',
     },
     tags: [{ type: String, index: true }], 
-    coordinates: {
-      type: { type: String, enum: ['Point'], required: true }, // 'Point' for GeoJSON
-      coordinates: { type: [Number], required: true }, // [longitude, latitude]
-    },
+    // coordinates: {
+    //   type: { type: String, enum: ['Point'], required: true }, // 'Point' for GeoJSON
+    //   coordinates: { type: [Number], required: true }, // [longitude, latitude]
+    // },
     created_at: { type: Date, default: Date.now, index: true },
     updated_at: { type: Date, default: Date.now },
   },

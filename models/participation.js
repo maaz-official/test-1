@@ -129,6 +129,20 @@ participationSchema.statics.getUserParticipationSummary = async function (userId
       },
     },
     {
+      $lookup: {
+        from: 'UserProfile', // Lookup user profiles
+        localField: 'user_id',
+        foreignField: 'user_id',
+        as: 'userProfile',
+      },
+    },
+    {
+      $unwind: {
+        path: '$userProfile',
+        preserveNullAndEmptyArrays: true, // Preserve documents without profiles
+      },
+    },
+    {
       $project: {
         eventName: '$eventDetails.name',
         status: 1,
@@ -137,6 +151,11 @@ participationSchema.statics.getUserParticipationSummary = async function (userId
         updated_at: 1,
         last_interaction: 1,
         engagement_score: 1,
+        userProfile: {
+          first_name: '$userProfile.first_name',
+          last_name: '$userProfile.last_name',
+          profile_picture_url: '$userProfile.profile_picture_url',
+        }, 
       },
     },
     {
