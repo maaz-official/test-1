@@ -254,6 +254,11 @@ exports.cancelEvent = async (eventId, currentUser) => {
     return 'Event cancelled successfully';
 };
 
+
+
+//////////////////////////////
+
+
 /**
  * Get all events (with Redis caching).
  */
